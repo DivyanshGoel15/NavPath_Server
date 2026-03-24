@@ -46,6 +46,8 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import paho.mqtt.client as mqtt
+import eventlet
+eventlet.monkey_patch()
 
 # ─────────────────────────────────────────────
 #  LOGGING SETUP
@@ -63,7 +65,7 @@ log = logging.getLogger('NavPath')
 app = Flask(__name__, static_folder='static')
 app.config['SECRET_KEY'] = 'navpath_secret_2026'
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ─────────────────────────────────────────────
 #  MQTT CONFIGURATION
