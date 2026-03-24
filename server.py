@@ -719,7 +719,7 @@ def watchdog():
         now = time.time()
         for amb_id in list(ambulances.keys()):
             last = ambulances[amb_id].get("last_seen", now)
-            if now - last > 10:
+            if now - last > 300:
                 log.warning(f"Ambulance {amb_id} timed out — clearing overrides")
                 # FIX: clear all locked intersections BEFORE deleting from dict
                 for int_id, state in intersection_states.items():
