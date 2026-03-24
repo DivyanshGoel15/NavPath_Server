@@ -356,7 +356,7 @@ def process_gps_update(amb_id, lat, lon, speed, priority, route_id):
         prev_dist       = amb.get("prev_dist", float('inf'))
 
         if (dist_to_current > prev_dist and
-                dist_to_current > threshold + 100 and
+                dist_to_current > 30 and
                 intersection_states[current_int_id]["locked_by"] == amb_id):
 
             send_resume(current_int_id, amb_id)
@@ -572,6 +572,12 @@ def receive_gps():
         # Full geofence logic — emits detailed analytics via WebSocket
         process_gps_update(amb_id, lat, lon, speed, priority, route_id)
     else:
+     # FIX: If priority is NONE (Emergency Ended), immediately drop all locks!
+        for int_id, state in intersection_states.items():
+            if state["locked_by"] == amb_id:
+                send_resume(int_id, amb_id)
+                intersection_states[int_id]["state"]     = "NORMAL"
+                intersection_states[int_id]["locked_by"] = None
         # FIX: Lightweight position-only emit so map dot moves even when
         #      priority is NONE or no route is selected.
         #      Uses build_intersection_list() — NOT the broken `intersections` global.
@@ -630,6 +636,13 @@ def set_priority():
 
     if amb_id in ambulances:
         ambulances[amb_id]["priority"] = priority
+
+    if priority == "NONE":
+        for int_id, state in intersection_states.items():
+            if state["locked_by"] == amb_id:
+                send_resume(int_id, amb_id)
+                intersection_states[int_id]["state"]     = "NORMAL"
+                intersection_states[int_id]["locked_by"] = None
 
     log_event("PRIORITY", f"{amb_id} set priority to {priority}",
               amb_id=amb_id, data={"priority": priority})
