@@ -2,119 +2,729 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>NavPath | Ambulance Terminal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-900 text-white h-screen flex flex-col font-sans">
 
-    <header class="bg-red-600 p-4 text-center shadow-lg">
-        <h1 class="text-2xl font-bold tracking-widest">🚑 NAVPATH EMS</h1>
-        <p class="text-red-200 text-sm">Mobile Data Terminal</p>
-    </header>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 
-    <main class="flex-1 flex flex-col p-6 gap-6 justify-center max-w-md mx-auto w-full">
-        
-        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center shadow-xl">
-            <h2 class="text-slate-400 text-sm font-bold uppercase tracking-widest mb-2">System Status</h2>
-            <div id="status-text" class="text-2xl font-bold text-slate-500">STANDBY</div>
-            <div id="gps-coords" class="text-xs text-slate-500 mt-4 font-mono">GPS: Not tracking</div>
-        </div>
-
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col gap-3">
-            <label class="text-xs font-bold text-slate-400 uppercase">Select Route</label>
-            <select id="route-select" class="bg-slate-900 border border-slate-600 rounded p-3 text-white w-full">
-                <option value="ROUTE-1">PGIMER → Sector 17</option>
-                <option value="ROUTE-2">Sector 17 → PGIMER</option>
-            </select>
-        </div>
-
-        <button id="btn-emergency" onclick="toggleEmergency()" class="bg-red-600 hover:bg-red-500 text-white text-2xl font-bold py-8 rounded-2xl shadow-[0_0_30px_rgba(220,38,38,0.4)] transition-all active:scale-95">
-            START EMERGENCY
-        </button>
-
-    </main>
-
-    <script>
-        let isTracking = false;
-        let gpsInterval;
-
-        function toggleEmergency() {
-            const btn = document.getElementById('btn-emergency');
-            const status = document.getElementById('status-text');
-
-            if (!isTracking) {
-                // START TRACKING
-                if (navigator.geolocation) {
-                    isTracking = true;
-                    btn.innerText = "END EMERGENCY";
-                    btn.classList.replace('bg-red-600', 'bg-slate-600');
-                    btn.classList.replace('hover:bg-red-500', 'hover:bg-slate-500');
-                    btn.classList.remove('shadow-[0_0_30px_rgba(220,38,38,0.4)]');
-                    
-                    status.innerText = "🔴 TRANSMITTING";
-                    status.classList.replace('text-slate-500', 'text-red-500');
-                    status.classList.add('animate-pulse');
-
-                    // Send GPS every 2 seconds
-                    gpsInterval = setInterval(sendLocation, 2000);
-                    sendLocation(); // send first one immediately
-                } else {
-                    alert("Geolocation is not supported by this browser.");
-                }
-            } else {
-                // STOP TRACKING
-                isTracking = false;
-                clearInterval(gpsInterval);
-                btn.innerText = "START EMERGENCY";
-                btn.classList.replace('bg-slate-600', 'bg-red-600');
-                btn.classList.replace('hover:bg-slate-500', 'hover:bg-red-500');
-                btn.classList.add('shadow-[0_0_30px_rgba(220,38,38,0.4)]');
-                
-                status.innerText = "STANDBY";
-                status.classList.replace('text-red-500', 'text-slate-500');
-                status.classList.remove('animate-pulse');
-                document.getElementById('gps-coords').innerText = "GPS: Tracking stopped";
-
-                // Notify server trip ended
-                fetch('/api/end_trip', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ amb_id: "AMB-2026" })
-                });
-            }
+    <style>
+        :root {
+            --bg:       #070c14;
+            --panel:    #0d1625;
+            --border:   #1a2d4a;
+            --border2:  #243d5c;
+            --txt:      #c8dff5;
+            --txt-dim:  #4e6a8a;
+            --accent:   #00d4ff;
+            --danger:   #ff3b5c;
+            --ok:       #00ff9d;
+            --warn:     #ffb800;
+            --mono:     'Share Tech Mono', monospace;
+            --head:     'Rajdhani', sans-serif;
         }
 
-        function sendLocation() {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    const speed = (position.coords.speed || 0) * 3.6; // m/s to km/h
-                    const route = document.getElementById('route-select').value;
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-                    document.getElementById('gps-coords').innerText = `GPS: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+        body {
+            background: var(--bg);
+            color: var(--txt);
+            font-family: var(--head);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
 
-                    // Send to your Render Flask Server
-                    fetch('/api/gps', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            amb_id: "AMB-2026",
-                            lat: lat,
-                            lon: lon,
-                            speed: speed,
-                            priority: "RED",
-                            route_id: route
-                        })
-                    }).catch(err => console.error("Network error:", err));
-                },
-                (error) => {
-                    document.getElementById('gps-coords').innerText = `GPS Error: ${error.message}`;
-                },
-                { enableHighAccuracy: true, maximumAge: 0 }
+        /* Scanline overlay */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,212,255,0.012) 2px,
+                rgba(0,212,255,0.012) 4px
             );
+            pointer-events: none;
+            z-index: 9999;
         }
-    </script>
+
+        /* ── Header ── */
+        header {
+            background: var(--panel);
+            border-bottom: 2px solid var(--danger);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-icon {
+            width: 36px; height: 36px;
+            border: 2px solid var(--danger);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 14px rgba(255,59,92,0.4);
+            animation: pulse-border 2s ease-in-out infinite;
+        }
+        @keyframes pulse-border {
+            0%,100% { box-shadow: 0 0 14px rgba(255,59,92,0.4); }
+            50%      { box-shadow: 0 0 24px rgba(255,59,92,0.7); }
+        }
+        .logo h1 { font-size: 18px; font-weight: 700; letter-spacing: 4px; color: white; }
+        .logo span { color: var(--txt-dim); font-size: 10px; letter-spacing: 2px; }
+
+        #clock {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--accent);
+            letter-spacing: 2px;
+        }
+
+        /* ── Main ── */
+        main {
+            flex: 1;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            max-width: 480px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* ── Status Card ── */
+        .status-card {
+            background: var(--panel);
+            border: 1px solid var(--border2);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .status-card::before {
+            content: '';
+            position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+            background: var(--status-color, var(--txt-dim));
+            transition: background 0.4s;
+        }
+        .status-label {
+            font-size: 9px; text-transform: uppercase; letter-spacing: 3px;
+            color: var(--txt-dim); margin-bottom: 8px;
+        }
+        .status-main {
+            font-size: 26px; font-weight: 700;
+            color: var(--status-color, var(--txt-dim));
+            transition: color 0.4s;
+            letter-spacing: 2px;
+        }
+        .status-main.pulse-anim { animation: text-pulse 1.2s ease-in-out infinite; }
+        @keyframes text-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+        .coords-row {
+            margin-top: 12px;
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .coord-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        .coord-box .lbl { font-size: 8px; color: var(--txt-dim); letter-spacing: 2px; margin-bottom: 4px; }
+        .coord-box .val { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+        /* ── Speed / ETA strip ── */
+        .telemetry-strip {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .tel-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 10px;
+            text-align: center;
+        }
+        .tel-card .lbl { font-size: 8px; text-transform: uppercase; letter-spacing: 2px; color: var(--txt-dim); margin-bottom: 6px; }
+        .tel-card .val { font-size: 22px; font-weight: 700; color: white; }
+        .tel-card .unit { font-size: 9px; color: var(--txt-dim); margin-top: 2px; }
+
+        /* ── Config Panel ── */
+        .config-panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .config-head {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+            color: var(--txt-dim);
+        }
+        .config-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label { font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: var(--txt-dim); }
+        .field select,
+        .field input {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            color: var(--txt);
+            padding: 10px 12px;
+            font-family: var(--head);
+            font-size: 14px;
+            font-weight: 600;
+            width: 100%;
+            appearance: none;
+            -webkit-appearance: none;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .field select:focus,
+        .field input:focus { border-color: var(--accent); }
+        .field select option { background: #0d1625; }
+
+        /* Priority selector */
+        .priority-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .pri-btn {
+            padding: 10px 6px;
+            border-radius: 6px;
+            border: 1px solid var(--border2);
+            background: transparent;
+            color: var(--txt-dim);
+            font-family: var(--head);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: all 0.15s;
+        }
+        .pri-btn:active { transform: scale(0.96); }
+        .pri-btn[data-pri="RED"].active    { color: var(--danger); border-color: var(--danger); background: rgba(255,59,92,.15); }
+        .pri-btn[data-pri="YELLOW"].active { color: var(--warn);   border-color: var(--warn);   background: rgba(255,184,0,.12); }
+        .pri-btn[data-pri="GREEN"].active  { color: var(--ok);     border-color: var(--ok);     background: rgba(0,255,157,.1);  }
+
+        /* ── Intersection Ahead ── */
+        .int-status {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+        }
+        .int-status.visible { display: block; }
+        .int-head {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+            color: var(--txt-dim);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .int-list { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .int-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+        .int-info .int-id { font-weight: 700; font-size: 14px; color: white; }
+        .int-info .int-name { font-size: 10px; color: var(--txt-dim); margin-top: 1px; }
+        .int-info .int-dist { font-family: var(--mono); font-size: 10px; color: var(--accent); margin-top: 2px; }
+        .state-badge {
+            font-family: var(--mono); font-size: 10px;
+            padding: 2px 8px; border-radius: 4px; border: 1px solid;
+        }
+        .st-NORMAL   { color: var(--ok);    border-color: var(--ok);    background: rgba(0,255,157,.08); }
+        .st-OVERRIDE { color: var(--danger); border-color: var(--danger); background: rgba(255,59,92,.1); animation: blink 1s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+        /* ── Emergency Button ── */
+        .btn-emergency {
+            padding: 22px;
+            border-radius: 16px;
+            border: none;
+            font-family: var(--head);
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-emergency:active { transform: scale(0.97); }
+        .btn-emergency::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: rgba(255,255,255,0.05);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .btn-emergency:hover::before { opacity: 1; }
+
+        .btn-start {
+            background: var(--danger);
+            color: white;
+            box-shadow: 0 0 32px rgba(255,59,92,0.45), 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .btn-stop {
+            background: var(--panel);
+            color: var(--danger);
+            border: 2px solid var(--danger);
+            box-shadow: 0 0 20px rgba(255,59,92,0.2);
+        }
+        .btn-disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* ── Log ── */
+        .log-panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .log-head {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+            color: var(--txt-dim);
+        }
+        #log-box {
+            padding: 10px;
+            height: 120px;
+            overflow-y: auto;
+            font-family: var(--mono);
+            font-size: 10px;
+            line-height: 1.7;
+        }
+        #log-box::-webkit-scrollbar { width: 3px; }
+        #log-box::-webkit-scrollbar-thumb { background: var(--border2); }
+        .log-ok      { color: var(--ok); }
+        .log-alert   { color: var(--danger); }
+        .log-info    { color: var(--accent); }
+        .log-normal  { color: var(--txt-dim); }
+
+        /* ── GPS accuracy indicator ── */
+        .gps-accuracy {
+            font-size: 9px; color: var(--txt-dim); margin-top: 4px; font-family: var(--mono);
+        }
+
+        /* Loading state for routes */
+        .routes-loading {
+            font-family: var(--mono); font-size: 11px; color: var(--txt-dim);
+            padding: 10px; text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">
+        <div class="logo-icon">🚑</div>
+        <div>
+            <h1>NAVPATH EMS</h1>
+            <span>AMBULANCE TERMINAL</span>
+        </div>
+    </div>
+    <div id="clock">--:--:--</div>
+</header>
+
+<main>
+
+    <!-- Status Card -->
+    <div class="status-card" id="status-card">
+        <div class="status-label">System Status</div>
+        <div class="status-main" id="status-text">STANDBY</div>
+        <div class="coords-row">
+            <div class="coord-box">
+                <div class="lbl">Latitude</div>
+                <div class="val" id="lat-val">—</div>
+            </div>
+            <div class="coord-box">
+                <div class="lbl">Longitude</div>
+                <div class="val" id="lon-val">—</div>
+            </div>
+        </div>
+        <div class="gps-accuracy" id="gps-accuracy">GPS: Not tracking</div>
+    </div>
+
+    <!-- Telemetry Strip -->
+    <div class="telemetry-strip">
+        <div class="tel-card">
+            <div class="lbl">Speed</div>
+            <div class="val" id="tel-speed">—</div>
+            <div class="unit">km/h</div>
+        </div>
+        <div class="tel-card">
+            <div class="lbl">ETA</div>
+            <div class="val" id="tel-eta">—</div>
+            <div class="unit">min</div>
+        </div>
+        <div class="tel-card">
+            <div class="lbl">Distance</div>
+            <div class="val" id="tel-dist">—</div>
+            <div class="unit">km left</div>
+        </div>
+    </div>
+
+    <!-- Config Panel -->
+    <div class="config-panel">
+        <div class="config-head">Mission Configuration</div>
+        <div class="config-body">
+
+            <div class="field">
+                <label>Unit ID</label>
+                <input type="text" id="amb-id" value="AMB-2026" maxlength="12" placeholder="AMB-XXXX">
+            </div>
+
+            <div class="field">
+                <label>Route</label>
+                <select id="route-select">
+                    <option value="">Loading routes...</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Priority Level</label>
+                <div class="priority-grid">
+                    <button class="pri-btn active" data-pri="RED"    onclick="setPriority('RED')">🔴 RED</button>
+                    <button class="pri-btn"        data-pri="YELLOW" onclick="setPriority('YELLOW')">🟡 YELLOW</button>
+                    <button class="pri-btn"        data-pri="GREEN"  onclick="setPriority('GREEN')">🟢 GREEN</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Intersection Status (shown during active trip) -->
+    <div class="int-status" id="int-status">
+        <div class="int-head">
+            <span>Intersections Ahead</span>
+            <span id="next-int-label" style="font-family:var(--mono);color:var(--accent);font-size:10px;"></span>
+        </div>
+        <div class="int-list" id="int-list"></div>
+    </div>
+
+    <!-- Emergency Button -->
+    <button class="btn-emergency btn-start" id="btn-emergency" onclick="toggleEmergency()">
+        START EMERGENCY
+    </button>
+
+    <!-- System Log -->
+    <div class="log-panel">
+        <div class="log-head">Terminal Log</div>
+        <div id="log-box">
+            <div class="log-info">[SYS] NavPath EMS terminal ready.</div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+// ── Clock ──────────────────────────────────────────────────────────────────
+setInterval(() => {
+    document.getElementById('clock').textContent =
+        new Date().toLocaleTimeString('en-IN', { hour12: false });
+}, 1000);
+
+// ── State ──────────────────────────────────────────────────────────────────
+let isTracking  = false;
+let gpsInterval = null;
+let selectedPriority = 'RED';
+let lastAnalytics    = null;
+
+// ── Priority Selection ─────────────────────────────────────────────────────
+function setPriority(pri) {
+    selectedPriority = pri;
+    document.querySelectorAll('.pri-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.pri === pri);
+    });
+    logMsg(`Priority set to ${pri}`, 'log-info');
+}
+
+// ── Load Routes from Server ─────────────────────────────────────────────────
+async function loadRoutes() {
+    try {
+        const res   = await fetch('/api/routes');
+        const routes = await res.json();
+        const sel   = document.getElementById('route-select');
+        sel.innerHTML = '';
+        routes.forEach(r => {
+            const opt  = document.createElement('option');
+            opt.value  = r.id;
+            opt.textContent = r.name;
+            sel.appendChild(opt);
+        });
+        logMsg(`${routes.length} routes loaded from server.`, 'log-ok');
+    } catch (e) {
+        // Fallback to server.py defaults if route fetch fails
+        const sel = document.getElementById('route-select');
+        sel.innerHTML = `
+            <option value="ROUTE-1">Chitkara → Morinda Civil Hospital</option>
+            <option value="ROUTE-2">Morinda Civil Hospital → Chitkara</option>
+            <option value="ROUTE-3">Chitkara → Rajpura Civil Hospital</option>
+        `;
+        logMsg('Route fetch failed — using defaults.', 'log-alert');
+    }
+}
+
+// ── Socket.IO — receive real-time analytics from server ────────────────────
+const socket = io({ transports: ['websocket', 'polling'] });
+
+socket.on('connect', () => {
+    logMsg('Server link established.', 'log-ok');
+});
+socket.on('disconnect', () => {
+    logMsg('Server link lost — reconnecting...', 'log-alert');
+});
+
+socket.on('analytics', (data) => {
+    if (data.amb_id !== getAmbId()) return;  // only process own analytics
+    lastAnalytics = data;
+    updateTelemetry(data);
+    updateIntersectionPanel(data.intersections);
+});
+
+socket.on('event', (evt) => {
+    if (evt.amb_id && evt.amb_id !== getAmbId()) return;
+    const cls = (evt.type === 'OVERRIDE' || evt.type === 'MANUAL_OVERRIDE') ? 'log-alert'
+              : (evt.type === 'RESUME' || evt.type === 'TRIP_COMPLETE')      ? 'log-ok'
+              : 'log-normal';
+    logMsg(`[${evt.type}] ${evt.message}`, cls);
+});
+
+socket.on('route_assigned', (data) => {
+    if (data.amb_id !== getAmbId()) return;
+    logMsg(`Route assigned: ${data.route.name}`, 'log-ok');
+});
+
+// ── Toggle Emergency ───────────────────────────────────────────────────────
+async function toggleEmergency() {
+    if (!isTracking) {
+        // Validate
+        const route = document.getElementById('route-select').value;
+        if (!route) { logMsg('Select a route first.', 'log-alert'); return; }
+        if (!navigator.geolocation) {
+            logMsg('Geolocation not available on this device.', 'log-alert');
+            return;
+        }
+
+        // Lock config fields
+        document.getElementById('amb-id').disabled = true;
+        document.getElementById('route-select').disabled = true;
+
+        // Assign route on server
+        try {
+            await fetch('/api/assign_route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amb_id: getAmbId(), route_id: route })
+            });
+        } catch (e) { /* non-fatal */ }
+
+        // Set priority on server
+        try {
+            await fetch('/api/set_priority', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amb_id: getAmbId(), priority: selectedPriority })
+            });
+        } catch (e) { /* non-fatal */ }
+
+        isTracking = true;
+        setStatus('🔴 TRANSMITTING', '#ff3b5c', true);
+
+        // Update button
+        const btn = document.getElementById('btn-emergency');
+        btn.textContent = 'END EMERGENCY';
+        btn.className   = 'btn-emergency btn-stop';
+
+        // Show intersection panel
+        document.getElementById('int-status').classList.add('visible');
+
+        logMsg(`Trip started — ${getAmbId()} on ${route} [${selectedPriority}]`, 'log-alert');
+
+        // Send GPS every 2 seconds
+        gpsInterval = setInterval(sendLocation, 2000);
+        sendLocation();   // immediate first ping
+
+    } else {
+        // END emergency
+        isTracking = false;
+        clearInterval(gpsInterval);
+        gpsInterval = null;
+
+        // Notify server
+        try {
+            await fetch('/api/end_trip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amb_id: getAmbId() })
+            });
+        } catch (e) { /* non-fatal */ }
+
+        // Re-enable config
+        document.getElementById('amb-id').disabled = false;
+        document.getElementById('route-select').disabled = false;
+
+        // Reset UI
+        setStatus('STANDBY', '#4e6a8a', false);
+        const btn = document.getElementById('btn-emergency');
+        btn.textContent = 'START EMERGENCY';
+        btn.className   = 'btn-emergency btn-start';
+
+        // Reset telemetry
+        document.getElementById('tel-speed').textContent = '—';
+        document.getElementById('tel-eta').textContent   = '—';
+        document.getElementById('tel-dist').textContent  = '—';
+        document.getElementById('lat-val').textContent   = '—';
+        document.getElementById('lon-val').textContent   = '—';
+        document.getElementById('gps-accuracy').textContent = 'GPS: Not tracking';
+        document.getElementById('int-status').classList.remove('visible');
+        document.getElementById('int-list').innerHTML = '';
+        document.getElementById('next-int-label').textContent = '';
+
+        logMsg(`Trip ended — ${getAmbId()}`, 'log-ok');
+    }
+}
+
+// ── Send GPS to server ─────────────────────────────────────────────────────
+function sendLocation() {
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat   = pos.coords.latitude;
+            const lon   = pos.coords.longitude;
+            const speed = (pos.coords.speed || 0) * 3.6;  // m/s → km/h
+            const acc   = pos.coords.accuracy;
+            const route = document.getElementById('route-select').value;
+
+            // Update GPS display
+            document.getElementById('lat-val').textContent  = lat.toFixed(5);
+            document.getElementById('lon-val').textContent  = lon.toFixed(5);
+            document.getElementById('gps-accuracy').textContent =
+                `GPS Accuracy: ±${Math.round(acc)}m`;
+
+            // POST to server
+            fetch('/api/gps', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    amb_id:   getAmbId(),
+                    lat:      lat,
+                    lon:      lon,
+                    speed:    speed,
+                    priority: selectedPriority,
+                    route_id: route
+                })
+            }).catch(err => logMsg(`GPS send error: ${err.message}`, 'log-alert'));
+        },
+        (err) => {
+            logMsg(`GPS error: ${err.message}`, 'log-alert');
+            document.getElementById('gps-accuracy').textContent = `GPS Error: ${err.message}`;
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+    );
+}
+
+// ── Update telemetry strip from server analytics ───────────────────────────
+function updateTelemetry(data) {
+    const spd  = data.speed    ? Math.round(data.speed)                         : '—';
+    const eta  = data.eta_seconds != null ? Math.round(data.eta_seconds / 60)  : '—';
+    const dist = data.dest_dist_m != null
+        ? (Math.round(data.dest_dist_m / 100) / 10).toFixed(1)
+        : '—';
+
+    document.getElementById('tel-speed').textContent = spd;
+    document.getElementById('tel-eta').textContent   = eta;
+    document.getElementById('tel-dist').textContent  = dist;
+}
+
+// ── Update intersection status panel ──────────────────────────────────────
+function updateIntersectionPanel(intersections) {
+    if (!intersections || !intersections.length) return;
+
+    const list = document.getElementById('int-list');
+    list.innerHTML = '';
+
+    // Sort by distance
+    const sorted = [...intersections].sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+    // Find closest override
+    const overrideInt = sorted.find(i => i.state === 'OVERRIDE' && i.locked_by === getAmbId());
+    document.getElementById('next-int-label').textContent =
+        overrideInt ? `⚡ ${overrideInt.id} CLEAR` : '';
+
+    sorted.forEach(tl => {
+        const dist = tl.distance != null ? `${tl.distance}m` : '—';
+        const hw   = tl.hardware ? `<span style="font-family:var(--mono);font-size:8px;
+                     background:rgba(0,212,255,.1);color:var(--accent);border:1px solid var(--border2);
+                     padding:1px 4px;border-radius:3px;margin-left:4px;">ESP32</span>` : '';
+        const row  = document.createElement('div');
+        row.className = 'int-row';
+        row.innerHTML = `
+            <div class="int-info">
+                <div class="int-id">${tl.id}${hw}</div>
+                <div class="int-name">${tl.name}</div>
+                <div class="int-dist">${dist} away</div>
+            </div>
+            <div class="state-badge st-${tl.state || 'NORMAL'}">${tl.state || 'NORMAL'}</div>
+        `;
+        list.appendChild(row);
+    });
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function getAmbId() {
+    return document.getElementById('amb-id').value.trim() || 'AMB-2026';
+}
+
+function setStatus(text, color, animate) {
+    const el   = document.getElementById('status-text');
+    const card = document.getElementById('status-card');
+    el.textContent = text;
+    el.style.setProperty('--status-color', color);
+    card.style.setProperty('--status-color', color);
+    el.style.color = color;
+    if (animate) {
+        el.classList.add('pulse-anim');
+    } else {
+        el.classList.remove('pulse-anim');
+    }
+}
+
+function logMsg(msg, cls = 'log-normal') {
+    const box  = document.getElementById('log-box');
+    const time = new Date().toLocaleTimeString('en-IN', { hour12: false });
+    const line = document.createElement('div');
+    line.className   = cls;
+    line.textContent = `[${time}] ${msg}`;
+    box.appendChild(line);
+    while (box.children.length > 80) box.removeChild(box.firstChild);
+    box.scrollTop = box.scrollHeight;
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadRoutes();
+</script>
 </body>
 </html>
