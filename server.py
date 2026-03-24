@@ -73,9 +73,9 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 #    mqtt_server = "broker.hivemq.com"
 #    client.subscribe("navpath/test/cmd")
 # ─────────────────────────────────────────────
-MQTT_BROKER    = 'broker.hivemq.com'
-MQTT_PORT      = 8000
-MQTT_CMD_TOPIC = 'navpath/test/cmd'   # Must match ESP32 subscribe topic exactly
+MQTT_BROKER    = 'broker.emqx.io'
+MQTT_PORT      = 8083  # EMQX uses 8083 for WebSockets
+MQTT_CMD_TOPIC = 'navpath/test/cmd'  # Must match ESP32 subscribe topic exactly
 
 # ─────────────────────────────────────────────
 #  HARDWARE MAP
