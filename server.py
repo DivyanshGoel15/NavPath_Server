@@ -77,61 +77,17 @@ HARDWARE_CONTROLLED = {"INT-1"}
 # ─────────────────────────────────────────────
 #  INTERSECTION DATABASE
 # ─────────────────────────────────────────────
-INTERSECTIONS = {
+intersections = {
     "INT-1": {
-        "id":      "INT-1",
-        "name":    "Sector 16 Chowk",
-        "lat":     30.7633,
-        "lon":     76.7784,
-        "hardware": True,
-        "approach_roads": {
-            "N": "From PGIMER side",
-            "S": "From Sector 24 side",
-            "E": "From Sector 15 side",
-            "W": "From Sector 16 side"
-        }
-    },
-    "INT-2": {
-        "id":      "INT-2",
-        "name":    "Museum Chowk Sector 10",
-        "lat":     30.7598,
-        "lon":     76.7756,
-        "hardware": False,
-        "approach_roads": {
-            "N": "From Sector 16 side",
-            "S": "From Sector 11 side",
-            "E": "From Sector 10 side",
-            "W": "From Sector 9 side"
-        }
-    },
-    "INT-3": {
-        "id":      "INT-3",
-        "name":    "Sector 22 Chowk",
-        "lat":     30.7402,
-        "lon":     76.7880,
-        "hardware": False,
-        "approach_roads": {
-            "N": "From Sector 21 side",
-            "S": "From Sector 23 side",
-            "E": "From Sector 22 side",
-            "W": "From Sector 21 side"
-        }
-    },
-    "INT-4": {
-        "id":      "INT-4",
-        "name":    "Sector 17 Plaza Chowk",
-        "lat":     30.7400,
-        "lon":     76.7800,
-        "hardware": False,
-        "approach_roads": {
-            "N": "From Sector 22 side",
-            "S": "From Sector 18 side",
-            "E": "From Sector 17 side",
-            "W": "From Sector 16 side"
-        }
+        "id": "INT-1",
+        "name": "Chitkara University Gate", # Updated Name
+        "lat": 30.5161,                     # Chitkara Latitude
+        "lon": 76.6598,                     # Chitkara Longitude
+        "state": "NORMAL",
+        "locked_by": None,
+        "hardware": True
     }
 }
-
 # ─────────────────────────────────────────────
 #  ROUTE DATABASE
 # ─────────────────────────────────────────────
