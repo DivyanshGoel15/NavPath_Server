@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NavPath | Command Center</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; }
+        #map { height: 65vh; border-radius: 0.75rem; border: 1px solid #334155; }
+        
+        /* Custom pulsing animation for the ambulance */
+        .pulse-icon {
+            background: #ef4444;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        /* Scrollable log area */
+        #log-container { max-height: 250px; overflow-y: auto; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col font-sans">
+
+    <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            <h1 class="text-xl font-bold tracking-wider text-white">NAVPATH <span class="text-slate-400 font-light text-sm">| City Command</span></h1>
+        </div>
+        <div id="connection-status" class="text-sm text-green-400 font-mono">● LIVE SYSTEM</div>
+    </header>
+
+    <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        
+        <div class="lg:col-span-2 flex flex-col gap-4">
+            <div class="bg-slate-800 p-1 rounded-xl shadow-lg">
+                <div id="map"></div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <p class="text-slate-400 text-xs uppercase tracking-wider">Active Overrides</p>
+                    <p id="stat-overrides" class="text-3xl font-bold text-red-400 mt-1">0</p>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <p class="text-slate-400 text-xs uppercase tracking-wider">Total Trips</p>
+                    <p id="stat-trips" class="text-3xl font-bold text-blue-400 mt-1">0</p>
+                </div>
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <p class="text-slate-400 text-xs uppercase tracking-wider">Hardware Status</p>
+                    <p class="text-lg font-bold text-green-400 mt-2">INT-1 Online</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-4">
+            
+            <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex-1">
+                <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">Active Units</h2>
+                <div id="ambulance-list" class="text-slate-400 text-sm italic">Waiting for GPS signal...</div>
+            </div>
+
+            <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex-1">
+                <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">Grid Status</h2>
+                <div id="intersection-list" class="flex flex-col gap-3">
+                    </div>
+            </div>
+
+            <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 h-64 flex flex-col">
+                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">System Logs</h2>
+                <div id="log-container" class="flex-1 flex flex-col gap-2 font-mono text-xs text-slate-400">
+                    <div>[SYS] Connecting to NavPath Cloud...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 1. Initialize Map (Centered on Chandigarh)
+        const map = L.map('map').setView([30.7500, 76.7800], 13);
+        
+        // Dark Mode Map Tiles (CartoDB)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+
+        // Icons & Markers
+        const ambIcon = L.divIcon({ className: 'pulse-icon', iconSize: 1});
+        let intMarkers = {};
+        let ambMarkers = {};
+
+        // 2. Connect to Flask Server via Socket.IO
+        const socket = io(); // Automatically connects to the host serving this page
+
+        // Helper: Add log entry
+        function logEvent(msg, isAlert=false) {
+            const container = document.getElementById('log-container');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const color = isAlert ? 'text-red-400' : 'text-slate-400';
+            container.innerHTML += `<div class="${color}">[${time}] ${msg}</div>`;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 3. Handle Initial Data Load
+        socket.on('init', (data) => {
+            logEvent("Grid configuration loaded.");
+            
+            // Draw Intersections on Map & Sidebar
+            const intList = document.getElementById('intersection-list');
+            intList.innerHTML = '';
+
+            data.intersections.forEach(tl => {
+                // Map Marker
+                let color = tl.state === "OVERRIDE" ? "red" : "#3b82f6"; // Red or Blue
+                intMarkers[tl.id] = L.circleMarker([tl.lat, tl.lon], {
+                    radius: 8, color: color, fillColor: color, fillOpacity: 0.8
+                }).addTo(map).bindPopup(`<b>${tl.name}</b><br>State: ${tl.state}`);
+
+                // Sidebar UI
+                let badge = tl.state === "NORMAL" 
+                    ? `<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs border border-green-500/30">NORMAL</span>`
+                    : `<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs border border-red-500/30">OVERRIDE (Locked)</span>`;
+                
+                let hwBadge = tl.hardware ? `<span class="text-[10px] bg-slate-700 px-1 rounded ml-2">ESP32</span>` : "";
+
+                intList.innerHTML += `
+                    <div class="flex justify-between items-center p-2 hover:bg-slate-700/50 rounded transition-colors" id="ui-${tl.id}">
+                        <div>
+                            <p class="font-bold text-slate-200 text-sm">${tl.id} ${hwBadge}</p>
+                            <p class="text-xs text-slate-400">${tl.name}</p>
+                        </div>
+                        <div id="badge-${tl.id}">${badge}</div>
+                    </div>
+                `;
+            });
+
+            // Update stats
+            document.getElementById('stat-overrides').innerText = data.stats.total_overrides;
+            document.getElementById('stat-trips').innerText = data.stats.total_trips;
+        });
+
+        // 4. Handle Live Ambulance Analytics Stream
+        socket.on('analytics', (data) => {
+            // Update or Create Ambulance Marker
+            if (!ambMarkers[data.amb_id]) {
+                ambMarkers[data.amb_id] = L.marker([data.lat, data.lon], {icon: ambIcon}).addTo(map);
+                logEvent(`Ambulance ${data.amb_id} detected on grid.`);
+            } else {
+                ambMarkers[data.amb_id].setLatLng([data.lat, data.lon]);
+            }
+
+            // Update Sidebar Ambulance UI
+            document.getElementById('ambulance-list').innerHTML = `
+                <div class="bg-slate-700/30 p-3 rounded-lg border border-slate-600">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-white flex items-center gap-2">🚑 ${data.amb_id}</span>
+                        <span class="${data.priority === 'RED' ? 'text-red-400' : 'text-yellow-400'} text-xs font-bold border border-current px-1 rounded">${data.priority}</span>
+                    </div>
+                    <div class="text-xs text-slate-400 grid grid-cols-2 gap-2 mt-2">
+                        <div><span class="block text-[10px] uppercase">Speed</span><span class="text-slate-200">${Math.round(data.speed)} km/h</span></div>
+                        <div><span class="block text-[10px] uppercase">Dest ETA</span><span class="text-slate-200">${Math.round(data.eta_seconds / 60)} min</span></div>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-600/50">
+                        <span class="block text-[10px] uppercase text-slate-400">Current Route</span>
+                        <span class="text-xs text-blue-300">${data.route_name}</span>
+                    </div>
+                </div>
+            `;
+
+            // Update Intersection UI States based on geofence logic
+            data.intersections.forEach(tl => {
+                let badgeEl = document.getElementById(`badge-${tl.id}`);
+                let marker = intMarkers[tl.id];
+                
+                if (tl.locked_by === data.amb_id) {
+                    if(badgeEl) badgeEl.innerHTML = `<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs border border-red-500/30 animate-pulse">OVERRIDE ACTIVE</span>`;
+                    if(marker) marker.setStyle({color: '#ef4444', fillColor: '#ef4444'});
+                } else {
+                    if(badgeEl) badgeEl.innerHTML = `<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs border border-green-500/30">NORMAL</span>`;
+                    if(marker) marker.setStyle({color: '#3b82f6', fillColor: '#3b82f6'});
+                }
+            });
+
+            // Update stats
+            document.getElementById('stat-overrides').innerText = data.stats.total_overrides;
+        });
+
+        // 5. Handle Live Events (Logs)
+        socket.on('event', (evt) => {
+            const isAlert = evt.type === "OVERRIDE" || evt.type === "MANUAL_OVERRIDE";
+            logEvent(`${evt.type}: ${evt.message}`, isAlert);
+        });
+
+    </script>
+</body>
+</html>
