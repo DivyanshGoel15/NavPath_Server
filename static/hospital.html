@@ -160,6 +160,7 @@
                 logEvent(`Ambulance ${data.amb_id} detected on grid.`);
             } else {
                 ambMarkers[data.amb_id].setLatLng([data.lat, data.lon]);
+                map.panTo([data.lat, data.lon]);
             }
 
             // Update Sidebar Ambulance UI
