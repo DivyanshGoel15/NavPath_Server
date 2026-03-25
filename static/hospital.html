@@ -399,7 +399,7 @@ margin-top:3px;
 DISPATCH
 </button>
 
-<button class="tab-btn">
+<button class="tab-btn" onclick="showTab('requests')">
 REQUESTS
 </button>
 
@@ -462,6 +462,25 @@ SYSTEM
 
     <!-- RIGHT -->
     <div class="right-col">
+        <div class="right-col">
+
+<!-- ADD REQUEST PANEL HERE -->
+<div id="requests-panel" class="panel hidden">
+
+<div class="panel-head">
+REQUESTS
+<span id="req-count">0</span>
+</div>
+
+<div class="panel-body" id="request-list">
+
+<div class="empty">
+No active requests
+</div>
+
+</div>
+
+</div>
         <!-- Active Units -->
         <div class="panel" style="flex:0 0 auto">
             <div class="panel-head">
