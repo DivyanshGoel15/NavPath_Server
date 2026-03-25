@@ -360,24 +360,30 @@
         </div>
 
         <div class="stat-strip">
-            <div class="stat-card s-red">
-                <p class="label">Active Overrides</p>
-                <p class="value" id="stat-overrides">0</p>
-            </div>
-            <div class="stat-card s-blue">
-                <p class="label">Total Trips</p>
-                <p class="value" id="stat-trips">0</p>
-            </div>
-            <div class="stat-card s-green">
-                <p class="label">Total Resumes</p>
-                <p class="value" id="stat-resumes">0</p>
-            </div>
-            <div class="stat-card s-warn">
-                <p class="label">Hardware</p>
-                <p class="value" style="font-size:14px;padding-top:4px">INT-1 ✓</p>
-            </div>
-        </div>
+
+    <div class="stat-card s-red">
+        <p class="label">TOTAL OVERRIDES</p>
+        <p class="value" id="stat-overrides">0</p>
     </div>
+
+    <div class="stat-card s-blue">
+        <p class="label">TOTAL EMERGENCIES</p>
+        <p class="value" id="stat-trips">0</p>
+    </div>
+
+    <div class="stat-card s-green">
+        <p class="label">INTERSECTIONS CLEARED</p>
+        <p class="value" id="stat-resumes">0</p>
+    </div>
+
+    <div class="stat-card s-warn">
+        <p class="label">SYSTEM STATUS</p>
+        <p class="value" style="font-size:14px;padding-top:4px">
+            LIVE ✓
+        </p>
+    </div>
+
+</div>
 
     <!-- RIGHT -->
     <div class="right-col">
@@ -410,6 +416,63 @@
         </div>
     </div>
 </main>
+
+    <script type="module">
+
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"
+
+// connect supabase
+const supabase = createClient(
+  https://culexbifyptlahcyzayd.supabase.co
+    sb_publishable_HcvBkHEOfrirPKZs4qRNbQ_7WDmbrQS
+)
+
+// load stats from database
+async function loadHeaderStats(){
+
+  const { count: overrides } = await supabase
+    .from("overrides")
+    .select("*",{ count:"exact", head:true })
+
+  const { count: trips } = await supabase
+    .from("emergencies")
+    .select("*",{ count:"exact", head:true })
+
+  const { count: resumes } = await supabase
+    .from("signal_events")
+    .select("*",{ count:"exact", head:true })
+
+  // update UI numbers
+  document.getElementById("stat-overrides").textContent = overrides || 0
+  document.getElementById("stat-trips").textContent = trips || 0
+  document.getElementById("stat-resumes").textContent = resumes || 0
+
+}
+
+// first load
+loadHeaderStats()
+
+// realtime update
+supabase.channel("live-dashboard")
+
+.on("postgres_changes",
+  { event:"*", schema:"public", table:"overrides" },
+  loadHeaderStats
+)
+
+.on("postgres_changes",
+  { event:"*", schema:"public", table:"emergencies" },
+  loadHeaderStats
+)
+
+.on("postgres_changes",
+  { event:"*", schema:"public", table:"signal_events" },
+  loadHeaderStats
+)
+
+.subscribe()
+
+
 
 <script>
 // ── Clock ──────────────────────────────────────────
