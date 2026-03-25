@@ -914,7 +914,11 @@ const MAP_STYLE_LIGHT = [];
    APP STATE
 ═══════════════════════════════════════ */
 /* ── SERVER CONFIG ── */
-const SERVER_URL = 'http://localhost:5000';
+// Auto-detect server URL: use the page origin when served from Render/GitHub Pages,
+// fall back to localhost:5000 for local development
+const SERVER_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000'
+  : window.location.origin;
 
 const APP = {
   user: null,
@@ -1736,10 +1740,12 @@ function assignRouteToServer(routeId){
 
 function acceptRoute(){
   document.getElementById('navDot').classList.remove('show');
-  // Pick server route if available, else fall back to Places hospital
+  // Use APP.routeId (set by applyRoute when dropdown was built/changed)
+  // fallback to srvSel.value, then fallback to Places hospital
   const srvSel = document.getElementById('srvRouteSel');
-  if(srvSel && srvSel.value){
-    assignRouteToServer(srvSel.value);
+  const routeToAssign = APP.routeId || (srvSel && srvSel.value);
+  if(routeToAssign){
+    assignRouteToServer(routeToAssign);
   } else if(!APP.navDestName && APP.nearbyResults.length){
     const h = APP.nearbyResults[0];
     APP.navDestName  = h.name;
@@ -2181,14 +2187,14 @@ function sendGpsUpdate(){
    POPULATE SERVER ROUTES DROPDOWN
 ═══════════════════════════════════════ */
 function populateServerRoutes(){
-  if(!APP.serverRoutes.length){
-    fetch(SERVER_URL+'/api/routes')
-      .then(r=>r.json())
-      .then(routes=>{ APP.serverRoutes=routes; buildServerRouteDropdown(); })
-      .catch(()=>buildServerRouteDropdown());
-  } else {
-    buildServerRouteDropdown();
-  }
+  // Always fetch fresh routes from server each time Route screen opens
+  fetch(SERVER_URL+'/api/routes')
+    .then(r=>r.json())
+    .then(routes=>{ APP.serverRoutes=routes; buildServerRouteDropdown(); })
+    .catch(()=>{
+      // If fetch fails but we have cached routes, use them
+      buildServerRouteDropdown();
+    });
 }
 function buildServerRouteDropdown(){
   let srvSel = document.getElementById('srvRouteSel');
@@ -2201,39 +2207,48 @@ function buildServerRouteDropdown(){
     if(btnGo) btnGo.parentNode.insertBefore(srvSel, btnGo);
   }
   if(!APP.serverRoutes.length){
-    srvSel.innerHTML = '<option value="">No server routes available</option>';
+    srvSel.innerHTML = '<option value="">No server routes available — is server running?</option>';
+    document.getElementById('routeIntList').innerHTML =
+      '<div style="padding:12px;font-family:var(--fM);font-size:10px;color:var(--txt3);text-align:center">Start the server and refresh the Route screen</div>';
     return;
   }
-  let html = '<option value="">— Select NavPath Route —</option>';
+
+  // Determine which route to pre-select
+  const preselect = APP.routeId || APP.serverRoutes[0].id;
+
+  let html = '';
   APP.serverRoutes.forEach(r=>{
-    const sel = r.id===APP.routeId ? ' selected' : '';
-    html += `<option value="${r.id}"${sel}>${r.name} (ETA ${r.navpath_eta})</option>`;
+    const sel = r.id === preselect ? ' selected' : '';
+    html += `<option value="${r.id}"${sel}>${r.name} · ETA ${r.navpath_eta}</option>`;
   });
   srvSel.innerHTML = html;
-  srvSel.onchange = ()=>{
-    const r = APP.serverRoutes.find(x=>x.id===srvSel.value);
+
+  function applyRoute(r){
     if(!r) return;
-    document.getElementById('rFrom').textContent = r.origin;
-    document.getElementById('rTo').textContent   = r.destination;
-    document.getElementById('navDest').textContent = r.destination;
-    APP.navDestName = r.destination;
+    APP.routeId = r.id;
+    document.getElementById('rFrom').textContent    = r.origin;
+    document.getElementById('rTo').textContent      = r.destination;
+    document.getElementById('navDest').textContent  = r.destination;
+    APP.navDestName  = r.destination;
     APP.navDestCoord = {lat: r.dest_lat, lng: r.dest_lon};
-    // Update ETA row from server route data
-    const etaMin = document.getElementById('etaMin');
-    const etaVs  = document.getElementById('etaVs');
+    const etaMin   = document.getElementById('etaMin');
+    const etaVs    = document.getElementById('etaVs');
     const etaSaved = document.getElementById('etaSaved');
-    if(etaMin) etaMin.textContent = r.navpath_eta;
-    if(etaVs)  etaVs.textContent  = 'vs ' + r.manual_eta + ' without NavPath';
+    if(etaMin)   etaMin.textContent   = r.navpath_eta;
+    if(etaVs)    etaVs.textContent    = 'vs ' + r.manual_eta + ' without NavPath';
     if(etaSaved) etaSaved.textContent = '\u26a1 ~' + r.time_saved;
-    // Load intersections for this route
     updateIntersectionList(r);
     previewRoute(APP.navDestCoord);
-  };
-  // If a route was already selected, refresh the intersection list
-  if(APP.routeId){
-    const r = APP.serverRoutes.find(x=>x.id===APP.routeId);
-    if(r) updateIntersectionList(r);
   }
+
+  srvSel.onchange = ()=>{
+    const r = APP.serverRoutes.find(x=>x.id===srvSel.value);
+    applyRoute(r);
+  };
+
+  // Auto-apply the pre-selected route immediately
+  const preRoute = APP.serverRoutes.find(x=>x.id===preselect);
+  applyRoute(preRoute);
 }
 
 /* ═══════════════════════════════════════
