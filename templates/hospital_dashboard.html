@@ -410,6 +410,24 @@
 
   /* SECTION DIVIDER */
   .section-divider { height:1px; background:linear-gradient(90deg, var(--accent-blue), transparent); margin:0 14px; opacity:0.3; }
+
+  .btn-logout {
+    padding: 6px 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .btn-logout:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: var(--red);
+    color: white;
+  }
 </style>
 </head>
 <body>
@@ -438,6 +456,7 @@
       <div class="sys-dot"><div class="dot yellow"></div>GPS</div>
     </div>
     <div class="time-display" id="clock">--:--:--</div>
+    <button id="logout-btn" class="btn-logout">Logout</button>
   </div>
 </div>
 
@@ -1664,6 +1683,15 @@ fetch('/api/events')
 // Show dispatch page on load
 document.getElementById('page-dispatch').style.display = 'flex';
 </script>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+<!-- Config and Auth Logic -->
+<script src="{{ url_for('static', filename='firebase-config.js') }}"></script>
+<script src="{{ url_for('static', filename='auth.js') }}"></script>
+
 </body>
 </html>
 

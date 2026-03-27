@@ -526,6 +526,10 @@ def hospital_legacy():
 def ambulance_app():
     return send_from_directory('static', 'ambulance.html')
 
+@app.route('/login')
+def login_page():
+    return render_template('login.html')
+
 # [INTEGRATION] All /api/* routes return JSON consumed by dashboard JS
 
 @app.route('/api/routes', methods=['GET'])
