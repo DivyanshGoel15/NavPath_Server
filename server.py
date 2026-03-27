@@ -2,7 +2,7 @@
 ============================================================
  NavPath Server — Cloud Version (Render Deployment)
  INTEGRATED with hospital_dashboard.html (improved UI)
-
+fsakl
  HARDWARE SETUP:
    - 1 ESP32 controls 1 intersection (INT-1: Chitkara University Gate)
    - 4 poles (N/S/E/W) × 3 lights = 12 LEDs total
