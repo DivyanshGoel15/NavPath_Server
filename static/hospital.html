@@ -378,6 +378,188 @@ font-size:11px;
 color:#4e6a8a;
 margin-top:3px;
 }
+
+.req-actions{
+display:flex;
+gap:8px;
+margin-top:8px;
+}
+
+.req-btn{
+padding:4px 8px;
+border:1px solid #00d4ff;
+background:transparent;
+color:#00d4ff;
+border-radius:4px;
+cursor:pointer;
+font-size:10px;
+transition:all .2s;
+flex:1;
+}
+
+.req-btn:hover{
+background:#00d4ff22;
+}
+
+.req-btn.danger{
+border-color:#ff3b5c;
+color:#ff3b5c;
+}
+
+.req-btn.danger:hover{
+background:#ff3b5c22;
+}
+
+/* Modal Styles */
+.modal{
+display:none;
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:rgba(0,0,0,0.8);
+z-index:10000;
+justify-content:center;
+align-items:center;
+}
+
+.modal.active{
+display:flex;
+}
+
+.modal-content{
+background:var(--panel);
+border:1px solid var(--border);
+border-radius:10px;
+padding:20px;
+max-width:500px;
+width:90%;
+max-height:80vh;
+overflow-y:auto;
+position:relative;
+}
+
+.modal-header{
+font-size:16px;
+font-weight:700;
+color:white;
+margin-bottom:16px;
+border-bottom:1px solid var(--border);
+padding-bottom:12px;
+}
+
+.modal-close{
+position:absolute;
+top:10px;
+right:10px;
+background:none;
+border:none;
+color:var(--accent);
+font-size:24px;
+cursor:pointer;
+}
+
+.form-group{
+margin-bottom:14px;
+}
+
+.form-group label{
+display:block;
+font-size:11px;
+color:var(--txt-dim);
+text-transform:uppercase;
+letter-spacing:1px;
+margin-bottom:4px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea{
+width:100%;
+padding:8px 10px;
+background:#0d1625;
+border:1px solid var(--border2);
+border-radius:4px;
+color:var(--txt);
+font-family:var(--head);
+font-size:12px;
+}
+
+.form-group textarea{
+resize:vertical;
+min-height:60px;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus{
+outline:none;
+border-color:var(--accent);
+box-shadow:0 0 8px rgba(0,212,255,0.2);
+}
+
+.form-actions{
+display:flex;
+gap:10px;
+margin-top:20px;
+}
+
+.form-actions button{
+flex:1;
+padding:10px;
+border:1px solid var(--border);
+background:var(--panel);
+color:var(--txt);
+border-radius:6px;
+cursor:pointer;
+font-size:12px;
+letter-spacing:1px;
+transition:all .2s;
+}
+
+.form-actions button:hover{
+border-color:var(--accent);
+color:var(--accent);
+}
+
+.form-actions button.submit{
+border-color:var(--ok);
+color:var(--ok);
+background:rgba(0,255,157,0.1);
+}
+
+.form-actions button.submit:hover{
+background:rgba(0,255,157,0.2);
+}
+
+.analytics-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+margin-top:10px;
+}
+
+.analytics-card{
+background:rgba(0,212,255,0.04);
+border:1px solid var(--border2);
+border-radius:6px;
+padding:10px;
+}
+
+.analytics-card .label{
+font-size:9px;
+text-transform:uppercase;
+letter-spacing:1px;
+color:var(--txt-dim);
+}
+
+.analytics-card .value{
+font-size:18px;
+font-weight:700;
+color:var(--accent);
+margin-top:4px;
+}
     </style>
 </head>
 <body>
@@ -406,12 +588,17 @@ margin-top:3px;
     <button class="tab-btn" onclick="showTab('system')">
         SYSTEM
     </button>
+    
 </div>
 
 
 
 
 <div class="header-right">
+    <button onclick="openRequestModal()" style="padding:8px 16px;background:#ff3b5c;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;letter-spacing:1px;transition:all .2s;margin-right:20px;" onmouseover="this.style.background='#ff5575'" onmouseout="this.style.background='#ff3b5c'">
+        🚨 NEW REQUEST
+    </button>
+
     <div id="clock">--:--:--</div>
 
     <div class="live-badge">
@@ -461,12 +648,12 @@ margin-top:3px;
     <div class="right-col">
         <div class="right-col">
 
-<!-- ADD REQUEST PANEL HERE -->
-<div id="requests-panel" class="panel hidden">
+<!-- REQUESTS PANEL -->
+<div id="requests-panel" class="panel">
 
 <div class="panel-head">
-REQUESTS
-<span id="req-count">0</span>
+EMERGENCY REQUESTS
+<span class="count" id="req-count">0</span>
 </div>
 
 <div class="panel-body" id="request-list">
@@ -475,6 +662,44 @@ REQUESTS
 No active requests
 </div>
 
+</div>
+
+</div>
+
+<!-- REQUEST ANALYTICS -->
+<div class="panel" style="flex:0 0 auto">
+
+<div class="panel-head">
+REQUEST ANALYTICS
+</div>
+
+<div class="panel-body">
+<div class="analytics-grid">
+<div class="analytics-card">
+<div class="label">TOTAL REQUESTS</div>
+<div class="value" id="analytics-total">0</div>
+</div>
+<div class="analytics-card">
+<div class="label">PENDING</div>
+<div class="value" id="analytics-pending">0</div>
+</div>
+<div class="analytics-card">
+<div class="label">ACCEPTED</div>
+<div class="value" id="analytics-accepted">0</div>
+</div>
+<div class="analytics-card">
+<div class="label">COMPLETED</div>
+<div class="value" id="analytics-completed">0</div>
+</div>
+<div class="analytics-card">
+<div class="label">AVG RESPONSE</div>
+<div class="value" id="analytics-response">0:00</div>
+</div>
+<div class="analytics-card">
+<div class="label">SUCCESS RATE</div>
+<div class="value" id="analytics-success">0%</div>
+</div>
+</div>
 </div>
 
 </div>
@@ -507,6 +732,53 @@ No active requests
         </div>
     </div>
 </main>
+
+<!-- NEW REQUEST MODAL -->
+<div id="requestModal" class="modal">
+<div class="modal-content">
+<button class="modal-close" onclick="closeRequestModal()">&times;</button>
+<div class="modal-header">🚨 NEW EMERGENCY REQUEST</div>
+
+<form id="emergencyForm" onsubmit="submitEmergencyRequest(event)">
+
+<div class="form-group">
+<label>Patient Name *</label>
+<input type="text" id="patientName" required placeholder="Full name">
+</div>
+
+<div class="form-group">
+<label>Location *</label>
+<input type="text" id="location" required placeholder="Address or coordinates">
+</div>
+
+<div class="form-group">
+<label>Phone Number</label>
+<input type="tel" id="phone" placeholder="(+91) XXXXX-XXXXX">
+</div>
+
+<div class="form-group">
+<label>Priority Level *</label>
+<select id="priority" required>
+<option value="RED">RED - Life Threatening</option>
+<option value="YELLOW" selected>YELLOW - Urgent</option>
+<option value="GREEN">GREEN - Non-Emergency</option>
+</select>
+</div>
+
+<div class="form-group">
+<label>Medical Issue *</label>
+<textarea id="medicalIssue" required placeholder="Describe the medical condition briefly..."></textarea>
+</div>
+
+<div class="form-actions">
+<button type="button" onclick="closeRequestModal()">CANCEL</button>
+<button type="submit" class="submit">SUBMIT REQUEST</button>
+</div>
+
+</form>
+
+</div>
+</div>
 
     <script type="module">
 
@@ -955,6 +1227,229 @@ function showTab(tab) {
     // Add active class to clicked button
     event.target.classList.add('active');
 }
+
+// ── EMERGENCY REQUEST MODAL FUNCTIONS ───────────────
+function openRequestModal() {
+    document.getElementById('requestModal').classList.add('active');
+    document.getElementById('emergencyForm').reset();
+}
+
+function closeRequestModal() {
+    document.getElementById('requestModal').classList.remove('active');
+}
+
+// Close modal when clicking outside
+document.getElementById('requestModal').onclick = function(event) {
+    if (event.target === this) {
+        closeRequestModal();
+    }
+}
+
+// ── SUBMIT EMERGENCY REQUEST ────────────────────────
+async function submitEmergencyRequest(event) {
+    event.preventDefault();
+    
+    const formData = {
+        patient_name: document.getElementById('patientName').value,
+        location: document.getElementById('location').value,
+        phone: document.getElementById('phone').value,
+        priority: document.getElementById('priority').value,
+        medical_issue: document.getElementById('medicalIssue').value
+    };
+    
+    try {
+        const response = await fetch('/api/emergency_requests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        if (response.ok) {
+            const request = await response.json();
+            logMsg(`[REQUEST] Created ${request.id} — PRIORITY: ${request.priority}`, 'log-ok');
+            closeRequestModal();
+            loadRequests();
+            loadRequestAnalytics();
+        } else {
+            logMsg('[ERROR] Failed to create request', 'log-alert');
+        }
+    } catch (err) {
+        logMsg(`[ERROR] ${err.message}`, 'log-alert');
+    }
+}
+
+// ── LOAD REQUESTS ───────────────────────────────────
+async function loadRequests() {
+    try {
+        const response = await fetch('/api/emergency_requests');
+        const requests = await response.json();
+        
+        const container = document.getElementById('request-list');
+        document.getElementById('req-count').textContent = requests.length;
+        
+        if (!requests.length) {
+            container.innerHTML = '<div class="empty">No active requests</div>';
+            return;
+        }
+        
+        container.innerHTML = requests.map(req => `
+            <div class="request-card">
+                <div class="req-title">
+                    🚨 ${req.patient_name} <span style="color:var(--txt-dim);font-size:10px;">${req.id}</span>
+                </div>
+                <div class="req-meta">
+                    📍 ${req.location}
+                </div>
+                <div class="req-meta">
+                    Issue: ${req.medical_issue.substring(0, 50)}...
+                </div>
+                <div class="req-meta">
+                    Status: <strong style="color:${getStatusColor(req.status)}">${req.status}</strong> | 
+                    Priority: <strong style="color:${getPriorityColor(req.priority)}">${req.priority}</strong>
+                </div>
+                ${req.status === 'PENDING' ? `
+                <div class="req-actions">
+                    <button class="req-btn" onclick="acceptRequest('${req.id}')">DISPATCH</button>
+                    <button class="req-btn danger" onclick="cancelRequest('${req.id}')">CANCEL</button>
+                </div>
+                ` : ''}
+                ${req.status === 'ACCEPTED' ? `
+                <div class="req-meta">
+                    🚑 Assigned to: ${req.assigned_ambulance}
+                </div>
+                <div class="req-actions">
+                    <button class="req-btn" onclick="completeRequest('${req.id}')">MARK COMPLETE</button>
+                </div>
+                ` : ''}
+            </div>
+        `).join('');
+    } catch (err) {
+        logMsg(`[ERROR] Failed to load requests: ${err.message}`, 'log-alert');
+    }
+}
+
+// ── ACCEPT / DISPATCH REQUEST ───────────────────────
+async function acceptRequest(req_id) {
+    const amb_id = Object.keys(ambData)[0] || 'AMB-2026'; // Get first active ambulance
+    
+    if (!amb_id) {
+        logMsg('[ERROR] No ambulances available', 'log-alert');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/emergency_requests/${req_id}/accept`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amb_id: amb_id })
+        });
+        
+        if (response.ok) {
+            const request = await response.json();
+            logMsg(`[DISPATCH] ${req_id} → ${amb_id} (Response: ${request.response_time}s)`, 'log-ok');
+            loadRequests();
+            loadRequestAnalytics();
+        } else {
+            logMsg('[ERROR] Failed to dispatch request', 'log-alert');
+        }
+    } catch (err) {
+        logMsg(`[ERROR] ${err.message}`, 'log-alert');
+    }
+}
+
+// ── COMPLETE REQUEST ────────────────────────────────
+async function completeRequest(req_id) {
+    try {
+        const response = await fetch(`/api/emergency_requests/${req_id}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            logMsg(`[COMPLETE] ${req_id} marked as completed`, 'log-ok');
+            loadRequests();
+            loadRequestAnalytics();
+        } else {
+            logMsg('[ERROR] Failed to complete request', 'log-alert');
+        }
+    } catch (err) {
+        logMsg(`[ERROR] ${err.message}`, 'log-alert');
+    }
+}
+
+// ── CANCEL REQUEST ──────────────────────────────────
+async function cancelRequest(req_id) {
+    if (!confirm('Are you sure you want to cancel this request?')) return;
+    
+    try {
+        // Update status to CANCELLED (simplified - can be a separate endpoint)
+        logMsg(`[CANCELLED] ${req_id}`, 'log-alert');
+        loadRequests();
+    } catch (err) {
+        logMsg(`[ERROR] ${err.message}`, 'log-alert');
+    }
+}
+
+// ── LOAD REQUEST ANALYTICS ──────────────────────────
+async function loadRequestAnalytics() {
+    try {
+        const response = await fetch('/api/request_analytics');
+        const analytics = await response.json();
+        
+        document.getElementById('analytics-total').textContent = analytics.total_requests;
+        document.getElementById('analytics-pending').textContent = analytics.pending_requests;
+        document.getElementById('analytics-accepted').textContent = analytics.accepted_requests;
+        document.getElementById('analytics-completed').textContent = analytics.completed_requests;
+        document.getElementById('analytics-response').textContent = analytics.response_time_str;
+        
+        // Calculate success rate
+        const total = analytics.total_requests;
+        const completed = analytics.completed_requests;
+        const successRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+        document.getElementById('analytics-success').textContent = successRate + '%';
+    } catch (err) {
+        console.error('Failed to load analytics:', err);
+    }
+}
+
+// ── COLOR HELPERS ───────────────────────────────────
+function getStatusColor(status) {
+    const colors = {
+        'PENDING': '#ffb800',
+        'ACCEPTED': '#00d4ff',
+        'IN_TRANSIT': '#0a8cff',
+        'COMPLETED': '#00ff9d',
+        'CANCELLED': '#ff3b5c'
+    };
+    return colors[status] || '#c8dff5';
+}
+
+function getPriorityColor(priority) {
+    const colors = {
+        'RED': '#ff3b5c',
+        'YELLOW': '#ffb800',
+        'GREEN': '#00ff9d'
+    };
+    return colors[priority] || '#c8dff5';
+}
+
+// ── SOCKET.IO REAL-TIME UPDATES ─────────────────────
+socket.on('request_created', (request) => {
+    loadRequests();
+    loadRequestAnalytics();
+});
+
+socket.on('request_updated', (request) => {
+    loadRequests();
+    loadRequestAnalytics();
+});
+
+// ── INITIAL LOAD ────────────────────────────────────
+loadRequests();
+loadRequestAnalytics();
+
+// Refresh analytics every 5 seconds
+setInterval(loadRequestAnalytics, 5000);
 </script>
 </body>
 </html>
