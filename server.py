@@ -53,6 +53,21 @@ import paho.mqtt.client as mqtt
 import eventlet
 eventlet.monkey_patch()
 
+# Import request state from app package (refactored)
+try:
+    from app.requests_state import emergency_requests, request_analytics
+except Exception:
+    # fallback for older layout
+    emergency_requests = {}
+    request_analytics = {
+        "total_requests":0,
+        "pending_requests":0,
+        "accepted_requests":0,
+        "completed_requests":0,
+        "avg_response_time":0,
+        "total_response_time":0
+    }
+
 # ─────────────────────────────────────────────
 #  LOGGING SETUP
 # ─────────────────────────────────────────────
@@ -217,6 +232,20 @@ intersection_states = {
 
 events = []
 
+# ─────────────────────────────────────────────
+#  EMERGENCY REQUESTS DATABASE
+# ─────────────────────────────────────────────
+emergency_requests = {}  # id → request object
+request_counter = 0
+request_analytics = {
+    "total_requests":    0,
+    "pending_requests":  0,
+    "accepted_requests": 0,
+    "completed_requests": 0,
+    "avg_response_time": 0,
+    "total_response_time": 0
+}
+
 stats = {
     "total_overrides":   0,
     "total_resumes":     0,
@@ -305,7 +334,6 @@ def log_event(event_type, message, amb_id=None, int_id=None, data=None):
     if len(events) > 500:
         events.pop(0)
     log.info(f"[{event_type}] {message}")
-    socketio.emit('event', event)
 
 # ─────────────────────────────────────────────
 #  MQTT CLIENT
@@ -682,72 +710,12 @@ def receive_gps():
 
     return jsonify({"status": "ok", "ts": time.time()})
 
-# [INTEGRATION] /api/assign_route — dispatched from route modal
-@app.route('/api/assign_route', methods=['POST'])
-def assign_route():
-    data     = request.get_json()
-    amb_id   = data.get("amb_id")
-    route_id = data.get("route_id")
-
-    if route_id not in ROUTES:
-        return jsonify({"error": "Invalid route"}), 400
-
-    route = ROUTES[route_id]
-
-    if amb_id in ambulances:
-        ambulances[amb_id]["active_int_idx"] = 0
-        ambulances[amb_id]["prev_dist"]      = float('inf')
-        ambulances[amb_id]["route_id"]       = route_id
-
-    socketio.emit('route_assigned', {"amb_id": amb_id, "route": route})
-    log_event("ROUTE_ASSIGNED", f"Route {route['name']} assigned to {amb_id}",
-              amb_id=amb_id, data={"route": route})
-    return jsonify({"status": "ok", "route": route})
-
-# [INTEGRATION] /api/set_priority — from priority selector button
-@app.route('/api/set_priority', methods=['POST'])
-def set_priority():
-    data     = request.get_json()
-    amb_id   = data.get("amb_id")
-    priority = data.get("priority")
-
-    if amb_id in ambulances:
-        ambulances[amb_id]["priority"] = priority
-
-    if priority == "NONE":
-        for int_id, state in intersection_states.items():
-            if state["locked_by"] == amb_id:
-                send_resume(int_id, amb_id)
-                intersection_states[int_id]["state"]          = "NORMAL"
-                intersection_states[int_id]["locked_by"]      = None
-                intersection_states[int_id]["override_start"] = None
-
-    log_event("PRIORITY", f"{amb_id} set priority to {priority}",
-              amb_id=amb_id, data={"priority": priority})
-    socketio.emit('priority_change', {"amb_id": amb_id, "priority": priority})
-    return jsonify({"status": "ok"})
-
-# [INTEGRATION] /api/end_trip — abort / trip complete
-@app.route('/api/end_trip', methods=['POST'])
-def end_trip():
-    data   = request.get_json()
-    amb_id = data.get("amb_id")
-
-    for int_id, state in intersection_states.items():
-        if state["locked_by"] == amb_id:
-            send_resume(int_id, amb_id)
-            intersection_states[int_id]["state"]          = "NORMAL"
-            intersection_states[int_id]["locked_by"]      = None
-            intersection_states[int_id]["override_start"] = None
-
-    if amb_id in ambulances:
-        trip_time = time.time() - ambulances[amb_id].get("trip_start", time.time())
-        log_event("TRIP_COMPLETE", f"{amb_id} trip complete — {round(trip_time)}s",
-                  amb_id=amb_id, data={"duration_s": round(trip_time)})
-        del ambulances[amb_id]
-
-    socketio.emit('trip_ended', {"amb_id": amb_id})
-    return jsonify({"status": "ok"})
+# Register emergency request blueprint
+try:
+    from app.api import emergency_bp
+    app.register_blueprint(emergency_bp)
+except Exception as e:
+    log.warning(f"Could not register emergency blueprint: {e}")
 
 # ─────────────────────────────────────────────
 #  WEBSOCKET EVENTS
@@ -764,6 +732,8 @@ def on_ws_connect():
         "intersections": build_intersection_list(),
         "ambulances":    list(ambulances.values()),
         "events":        list(reversed(events[-50:])),
+        "requests":      list(emergency_requests.values()),
+        "request_analytics": request_analytics,
         "stats": {
             **stats,
             "time_saved_str": f"{ts_min}:{ts_sec:02d}",
