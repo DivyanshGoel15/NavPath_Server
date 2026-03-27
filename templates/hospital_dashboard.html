@@ -434,15 +434,7 @@
     <div class="map-container" style="flex:1; position:relative;">
       <div id="map"></div>
       <!-- Override popup — [INTEGRATION] shown when WebSocket reports OVERRIDE state -->
-      <div class="map-popup-info" id="intPopup" style="display:none;">
-        <div class="map-popup-title" id="popupTitle">◉ Override Active</div>
-        <div class="popup-compare">
-          <div><div class="popup-val bad">47s</div><div class="popup-item-label">Without NavPath</div></div>
-          <div class="popup-arrow">→</div>
-          <div><div class="popup-val good">0s</div><div class="popup-item-label">With NavPath</div></div>
-        </div>
-        <div id="popupDetail" style="margin-top:8px; font-size:10px; color:var(--text-secondary);"></div>
-      </div>
+      <!-- Override popup removed per request -->
       <!-- Map controls -->
       <div style="position:absolute; top:12px; right:12px; z-index:500; display:flex; flex-direction:column; gap:6px;">
         <button onclick="map.setZoom(map.getZoom()+1)" style="width:30px;height:30px;background:var(--bg-panel);border:1px solid var(--border);color:var(--text-primary);cursor:pointer;border-radius:4px;font-size:16px;">+</button>
@@ -971,16 +963,8 @@ function updateIntersections(intersections) {
 
 // Show/hide override popup when an intersection goes into override
 function checkOverridePopup(intersections, ambId) {
-  const overrideInt = intersections.find(i => i.state === 'OVERRIDE' && i.locked_by === ambId);
-  const popup = document.getElementById('intPopup');
-  if (overrideInt) {
-    document.getElementById('popupTitle').textContent = `◉ ${overrideInt.id} — Override Active`;
-    document.getElementById('popupDetail').textContent =
-      `${ambId} corridor locked. Distance: ${overrideInt.distance || '--'}m`;
-    popup.style.display = 'block';
-  } else {
-    popup.style.display = 'none';
-  }
+  // Override popup removed — function retained as no-op to avoid errors from callers.
+  return;
 }
 
 // ══════════════════════════════════════════════
