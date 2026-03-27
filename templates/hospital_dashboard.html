@@ -1053,7 +1053,9 @@ function updateSavingsBar(s) {
   }
   // Update active ambulances count (may appear in multiple places)
   if (s.ambulances !== undefined) {
-    document.querySelectorAll('#an-ambulances').forEach(el => el.textContent = s.ambulances || 0);
+    // Analytics card (in analytics page) should show active ambulances
+    const analyticsAmb = document.querySelector('.analytics-grid #an-ambulances');
+    if (analyticsAmb) analyticsAmb.textContent = s.ambulances || 0;
   }
 }
 
