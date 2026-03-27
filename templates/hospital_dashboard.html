@@ -33,6 +33,70 @@
     --glow-green: 0 0 20px rgba(34,197,94,0.3);
     --glow-red: 0 0 20px rgba(239,68,68,0.4);
   }
+
+  .req-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 8px;
+  transition: 0.2s;
+}
+
+.req-card:hover {
+  border-color: var(--accent-blue);
+  background: var(--bg-hover);
+}
+
+.req-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.req-id {
+  font-family: 'Share Tech Mono';
+  font-size: 13px;
+  color: var(--accent-cyan);
+}
+
+.req-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.req-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.req-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-accept {
+  flex: 1;
+  background: rgba(34,197,94,0.15);
+  border: 1px solid rgba(34,197,94,0.4);
+  color: #4ade80;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.btn-reject {
+  flex: 1;
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.4);
+  color: #f87171;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
     background: var(--bg-deep);
@@ -970,6 +1034,45 @@ function checkOverridePopup(intersections, ambId) {
 // ══════════════════════════════════════════════
 //  AMBULANCE CARDS (left panel)
 // ══════════════════════════════════════════════
+function renderRequests() {
+  const el = document.getElementById('requestsList');
+
+  if (!requestsData.length) {
+    el.innerHTML = '<div class="empty-state">No active SOS requests</div>';
+    return;
+  }
+
+  el.innerHTML = requestsData.map(req => `
+    <div class="req-card priority-${req.priority.toLowerCase()}">
+
+      <div class="req-top">
+        <div>
+          <div class="req-id">${req.id}</div>
+          <div class="req-name">${req.name}</div>
+        </div>
+        <div class="priority-badge ${req.priority.toLowerCase()}">
+          ${req.priority}
+        </div>
+      </div>
+
+      <div class="req-body">
+        <div>📍 ${req.location}</div>
+        <div>📞 ${req.phone}</div>
+        <div>⏱ ${req.time}</div>
+      </div>
+
+      <div class="req-actions">
+        <button class="btn-accept" onclick="acceptRequest('${req.id}')">
+          Accept
+        </button>
+        <button class="btn-reject" onclick="rejectRequest('${req.id}')">
+          Reject
+        </button>
+      </div>
+
+    </div>
+  `).join('');
+}
 function renderAmbulances() {
   const el  = document.getElementById('ambSection');
   const ids = Object.keys(ambData);
@@ -1507,11 +1610,22 @@ async function loadRequestAnalytics() {
   } catch (e) { console.error('loadRequestAnalytics', e); }
 }
 
-async function acceptRequest(reqId) {
-  try {
-    await fetch(`/api/emergency_requests/${reqId}/accept`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ amb_id: selectedAmbId || '' }) });
-  } catch(e){ console.error(e); }
-  loadRequests(); loadRequestAnalytics();
+async function acceptRequest(id) {
+  const req = requestsData.find(r => r.id === id);
+
+  // Step 1: remove instantly (fast UI)
+  requestsData = requestsData.filter(r => r.id !== id);
+  renderRequests();
+
+  // Step 2: open assignment directly
+  openRouteModal();
+
+  // Step 3: backend update
+  await fetch('/api/request_action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, action: 'ACCEPT' })
+  });
 }
 
 async function completeRequest(reqId) {
