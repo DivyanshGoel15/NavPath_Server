@@ -787,6 +787,11 @@ socket.on('init', (data) => {
 
   // Set map center if server provides it
   if (data.map_center) map.setView([data.map_center.lat, data.map_center.lon], data.map_center.zoom || 13);
+
+  // Load initial requests (if any) and analytics provided by server on connect
+  if (data.requests && data.requests.length) {
+    try { loadRequests(); loadRequestAnalytics(); } catch(e) { console.error('init requests', e); }
+  }
 });
 
 // [INTEGRATION] 'analytics' — live GPS + intersection update (1/sec per ambulance)
@@ -810,6 +815,19 @@ socket.on('analytics', (data) => {
 
   // Update savings bar
   if (data.stats) updateSavingsBar(data.stats);
+
+  // Update analytics page DOM in real-time when visible
+  try {
+    const s = data.stats;
+    if (s && document.getElementById('page-analytics').style.display !== 'none') {
+      document.getElementById('an-trips').textContent      = s.total_trips || 0;
+      document.getElementById('an-overrides').textContent  = s.total_overrides || 0;
+      document.getElementById('an-resumes').textContent    = s.total_resumes || 0;
+      document.getElementById('an-cleared').textContent    = s.intersections_cleared || 0;
+      document.getElementById('an-saved').textContent      = s.time_saved_str || (s.time_saved_seconds ? `${Math.floor(s.time_saved_seconds/60)}:${String(s.time_saved_seconds%60).padStart(2,'0')}` : '0:00');
+      document.getElementById('an-ambulances').textContent = s.ambulances || 0;
+    }
+  } catch (e) { /* ignore DOM update errors */ }
 });
 
 // [INTEGRATION] 'event' — system log entries pushed from server
