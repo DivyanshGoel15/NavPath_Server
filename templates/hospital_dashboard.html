@@ -1038,10 +1038,23 @@ function selectAmb(id) {
 // ══════════════════════════════════════════════
 function updateSavingsBar(s) {
   if (!s) return;
-  if (s.time_saved_str) document.getElementById('timeSaved').textContent   = s.time_saved_str;
-  if (s.total_trips     !== undefined) document.getElementById('tripsHandled').textContent  = s.total_trips;
-  if (s.intersections_cleared !== undefined) document.getElementById('intCleared').textContent   = s.intersections_cleared;
-  if (s.total_overrides !== undefined) document.getElementById('totalOverrides').textContent = s.total_overrides;
+  // Update top savings bar and analytics cards (support duplicate/missing IDs safely)
+  if (s.time_saved_str !== undefined) {
+    document.querySelectorAll('#an-saved, #timeSaved').forEach(el => el.textContent = s.time_saved_str || '0:00');
+  }
+  if (s.total_trips !== undefined) {
+    document.querySelectorAll('#tripsHandled, #an-trips').forEach(el => el.textContent = s.total_trips || 0);
+  }
+  if (s.intersections_cleared !== undefined) {
+    document.querySelectorAll('#intCleared').forEach(el => el.textContent = s.intersections_cleared || 0);
+  }
+  if (s.total_overrides !== undefined) {
+    document.querySelectorAll('#totalOverrides').forEach(el => el.textContent = s.total_overrides || 0);
+  }
+  // Update active ambulances count (may appear in multiple places)
+  if (s.ambulances !== undefined) {
+    document.querySelectorAll('#an-ambulances').forEach(el => el.textContent = s.ambulances || 0);
+  }
 }
 
 // ══════════════════════════════════════════════
