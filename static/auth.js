@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // Handle Login
+    // Handle Login (Email)
     if (loginForm) {
         loginForm.addEventListener("submit", (e) => {
             e.preventDefault();
@@ -37,13 +37,32 @@ document.addEventListener("DOMContentLoaded", function() {
                     window.location.href = "/";
                 })
                 .catch(err => {
-                    if (errorMessage) {
-                        errorMessage.innerText = err.message;
-                        errorMessage.style.display = "block";
-                    }
-                    console.error("Login Error:", err);
+                    handleAuthError(err);
                 });
         });
+    }
+
+    // Handle Google Login
+    const googleBtn = document.getElementById("google-login-btn");
+    if (googleBtn) {
+        googleBtn.addEventListener("click", () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then(() => {
+                    window.location.href = "/";
+                })
+                .catch(err => {
+                    handleAuthError(err);
+                });
+        });
+    }
+
+    function handleAuthError(err) {
+        if (errorMessage) {
+            errorMessage.innerText = err.message;
+            errorMessage.style.display = "block";
+        }
+        console.error("Auth Error:", err);
     }
 
     // Handle Logout
