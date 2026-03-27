@@ -563,7 +563,7 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
         </div>
         <div class="fGrp">
           <div class="fLbl">Fleet / Hospital <span class="req">*</span></div>
-          <select class="fIn" id="sHosp" style="appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23445566' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 13px center;">
+          <select class="fIn" id="sHosp" style="appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'8\' viewBox=\'0 0 12 8\'%3E%3Cpath d=\'M1 1l5 5 5-5\' stroke=\'%23445566\' stroke-width=\'1.5\' fill=\'none\' stroke-linecap=\'round\'/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 13px center;">
             <option value="" disabled selected>Select your fleet</option>
             <option>AIIMS Trauma Centre</option>
             <option>Safdarjung Hospital</option>
@@ -860,7 +860,7 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
       <div class="sItem" onclick="toast('📞 +91-11-26588500')"><div class="sItem-L"><div class="sIco">📞</div><div><div class="sNm">Dispatch Hotline</div><div class="sSub">+91-11-26588500</div></div></div><div class="sItem-R hi">Edit</div></div>
       <div class="secTtl">System</div>
       <div class="sItem"><div class="sItem-L"><div class="sIco">ℹ</div><div><div class="sNm">About NavPath</div><div class="sSub">v4.0 · Server: Online</div></div></div></div>
-      <button class="btnLogout" onclick="doLogout()">↩ Logout</button>
+      <button id="logout-btn" class="btnLogout">↩ Logout</button>
     </div>
   </div>
 </div>
@@ -2707,5 +2707,14 @@ window.addEventListener('DOMContentLoaded',()=>{
   });
 });
 </script>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+<!-- Config and Auth Logic -->
+<script src="/static/firebase-config.js"></script>
+<script src="/static/auth.js"></script>
+
 </body>
 </html>

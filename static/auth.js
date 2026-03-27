@@ -25,6 +25,59 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
+    // Check for Email Link Sign-in
+    if (auth.isSignInWithEmailLink(window.location.href)) {
+        let email = window.localStorage.getItem('emailForSignIn');
+        if (!email) {
+            email = window.prompt('Please provide your email for confirmation');
+        }
+        auth.signInWithEmailLink(email, window.location.href)
+            .then(() => {
+                window.localStorage.removeItem('emailForSignIn');
+                window.location.href = "/";
+            })
+            .catch(err => {
+                handleAuthError(err);
+            });
+    }
+
+    // Toggle Direct Login Form
+    const showDirectBtn = document.getElementById("show-direct-login");
+    const directForm = document.getElementById("direct-login-form");
+    if (showDirectBtn && directForm) {
+        showDirectBtn.addEventListener("click", () => {
+            directForm.style.display = directForm.style.display === "none" ? "block" : "none";
+        });
+    }
+
+    // Handle Send Link
+    const sendLinkBtn = document.getElementById("send-link-btn");
+    const directEmailInput = document.getElementById("direct-email");
+    const successMsg = document.getElementById("success-message");
+
+    if (sendLinkBtn) {
+        sendLinkBtn.addEventListener("click", () => {
+            const email = directEmailInput.value;
+            const actionCodeSettings = {
+                url: window.location.origin + "/login",
+                handleCodeInApp: true
+            };
+
+            auth.sendSignInLinkToEmail(email, actionCodeSettings)
+                .then(() => {
+                    window.localStorage.setItem('emailForSignIn', email);
+                    if (successMsg) {
+                        successMsg.innerText = "Check your email for the login link!";
+                        successMsg.style.display = "block";
+                    }
+                    if (errorMessage) errorMessage.style.display = "none";
+                })
+                .catch(err => {
+                    handleAuthError(err);
+                });
+        });
+    }
+
     // Handle Login (Email)
     if (loginForm) {
         loginForm.addEventListener("submit", (e) => {
@@ -62,6 +115,7 @@ document.addEventListener("DOMContentLoaded", function() {
             errorMessage.innerText = err.message;
             errorMessage.style.display = "block";
         }
+        if (successMsg) successMsg.style.display = "none";
         console.error("Auth Error:", err);
     }
 
