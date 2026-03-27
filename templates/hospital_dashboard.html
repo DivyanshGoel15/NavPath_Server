@@ -362,6 +362,7 @@
   <div class="topbar-center">
     <button class="tab-btn active" onclick="switchPage('dispatch', this)">⬡ Dispatch</button>
     <button class="tab-btn" onclick="switchPage('analytics', this)">▲ Analytics</button>
+    <button class="tab-btn" onclick="switchPage('requests', this)">⚑ Requests</button>
     <button class="tab-btn" onclick="switchPage('fleet', this)">◈ Fleet</button>
     <button class="tab-btn" onclick="switchPage('health', this)">◉ System</button>
   </div>
@@ -469,6 +470,41 @@
       <div class="panel-title">Intersection Status <span class="count-badge" id="intCountBadge">0</span></div>
     </div>
     <div class="right-scroll" id="intersectionList"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- REQUESTS PAGE                                -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="page" id="page-requests">
+  <div style="display:flex;padding:16px;gap:12px;flex:1;">
+    <div style="flex:1;">
+      <div class="panel-section">
+        <div class="panel-header">
+          <div class="panel-title">Emergency Requests <span class="count-badge" id="reqCountBadge">0</span></div>
+        </div>
+        <div class="panel-content" id="requestsList">
+          <div class="empty-state">No requests</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:320px;flex-shrink:0;">
+      <div class="panel-section">
+        <div class="panel-header">
+          <div class="panel-title">Request Analytics</div>
+        </div>
+        <div class="panel-content" style="padding:12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="stat-card"><div class="stat-card-val" id="ra-total">0</div><div class="stat-card-label">Total</div></div>
+            <div class="stat-card"><div class="stat-card-val" id="ra-pending">0</div><div class="stat-card-label">Pending</div></div>
+            <div class="stat-card"><div class="stat-card-val" id="ra-accepted">0</div><div class="stat-card-label">Accepted</div></div>
+            <div class="stat-card"><div class="stat-card-val" id="ra-completed">0</div><div class="stat-card-label">Completed</div></div>
+          </div>
+          <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);">Avg response: <span id="ra-avg">0:00</span></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -663,6 +699,7 @@ function switchPage(name, btn) {
   document.getElementById('page-' + name).style.display = 'flex';
   if (btn) btn.classList.add('active');
   if (name === 'analytics') { renderCharts(); loadAnalyticsStats(); }
+  if (name === 'requests')  { loadRequests(); loadRequestAnalytics(); }
   if (name === 'fleet')     loadFleet();
   if (name === 'health')    loadSystemHealth();
 }
@@ -1375,6 +1412,94 @@ function nowStr() {
 }
 
 // ══════════════════════════════════════════════
+//  REQUESTS — socket handlers + UI rendering
+// ══════════════════════════════════════════════
+socket.on('request_created', (d) => {
+  try { loadRequests(); loadRequestAnalytics(); } catch(e){ console.error('request_created', e); }
+  addEventEntry({ type:'info', message:`New request ${d.id || ''}`, timestamp: nowStr() });
+});
+
+socket.on('request_updated', (d) => {
+  try { loadRequests(); loadRequestAnalytics(); } catch(e){ console.error('request_updated', e); }
+});
+
+async function loadRequests() {
+  const list = document.getElementById('requestsList');
+  const badge = document.getElementById('reqCountBadge');
+  if (!list) return;
+  try {
+    const res = await fetch('/api/emergency_requests');
+    if (!res.ok) throw new Error('Failed to fetch requests');
+    const data = await res.json();
+    badge && (badge.textContent = (data && data.length) || 0);
+    list.innerHTML = '';
+    if (!data || data.length === 0) { list.innerHTML = '<div class="empty-state">No requests</div>'; return; }
+    data.sort((a,b)=> new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+    data.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'int-card';
+      const assigned = r.amb_id ? `<div style="font-size:11px;color:var(--text-secondary)">Assigned: <b style="color:var(--text-primary)">${r.amb_id}</b></div>` : '';
+      card.innerHTML = `
+        <div class="int-header">
+          <div>
+            <div class="int-id">${r.id || ''}</div>
+            <div class="int-name">${r.patient_name || r.name || 'Unknown'}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--text-secondary)">${(r.priority||'').toUpperCase()}</div>
+            <div style="font-size:12px;font-family:'Share Tech Mono',monospace">${r.status || ''}</div>
+          </div>
+        </div>
+        <div style="padding-top:8px;font-size:12px;color:var(--text-secondary)">${r.location || r.address || ''}</div>
+        <div style="margin-top:8px;">${assigned}</div>
+      `;
+      const actions = document.createElement('div');
+      actions.className = 'amb-actions';
+      if (r.status === 'PENDING') {
+        const a = document.createElement('button'); a.className='amb-btn assign'; a.textContent='Accept'; a.onclick = ()=> acceptRequest(r.id);
+        const c = document.createElement('button'); c.className='amb-btn abort'; c.textContent='Cancel'; c.onclick = ()=> cancelRequest(r.id);
+        actions.appendChild(a); actions.appendChild(c);
+      } else if (r.status === 'ACCEPTED') {
+        const comp = document.createElement('button'); comp.className='amb-btn assign'; comp.textContent='Complete'; comp.onclick = ()=> completeRequest(r.id);
+        actions.appendChild(comp);
+      }
+      card.appendChild(actions);
+      list.appendChild(card);
+    });
+  } catch (err) { console.error('loadRequests error', err); list.innerHTML = '<div class="empty-state">Unable to load requests</div>'; }
+}
+
+async function loadRequestAnalytics() {
+  try {
+    const res = await fetch('/api/request_analytics');
+    if (!res.ok) throw new Error('analytics fetch failed');
+    const d = await res.json();
+    document.getElementById('ra-total') && (document.getElementById('ra-total').textContent = d.total_requests || 0);
+    document.getElementById('ra-pending') && (document.getElementById('ra-pending').textContent = d.pending_requests || 0);
+    document.getElementById('ra-accepted') && (document.getElementById('ra-accepted').textContent = d.accepted_requests || 0);
+    document.getElementById('ra-completed') && (document.getElementById('ra-completed').textContent = d.completed_requests || 0);
+    document.getElementById('ra-avg') && (document.getElementById('ra-avg').textContent = d.response_time_str || d.avg_response_time || '0:00');
+  } catch (e) { console.error('loadRequestAnalytics', e); }
+}
+
+async function acceptRequest(reqId) {
+  try {
+    await fetch(`/api/emergency_requests/${reqId}/accept`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ amb_id: selectedAmbId || '' }) });
+  } catch(e){ console.error(e); }
+  loadRequests(); loadRequestAnalytics();
+}
+
+async function completeRequest(reqId) {
+  try { await fetch(`/api/emergency_requests/${reqId}/complete`, { method:'POST' }); } catch(e){ console.error(e); }
+  loadRequests(); loadRequestAnalytics();
+}
+
+async function cancelRequest(reqId) {
+  try { await fetch(`/api/emergency_requests/${reqId}/complete`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cancelled:true }) }); } catch(e){ console.error(e); }
+  loadRequests(); loadRequestAnalytics();
+}
+
+// ══════════════════════════════════════════════
 //  [INTEGRATION] REST FALLBACK — load map data if WS is slow
 // ══════════════════════════════════════════════
 fetch('/api/map_data')
@@ -1402,3 +1527,4 @@ document.getElementById('page-dispatch').style.display = 'flex';
 </script>
 </body>
 </html>
+
