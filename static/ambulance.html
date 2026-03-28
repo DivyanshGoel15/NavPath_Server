@@ -432,6 +432,18 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
 .ambMarker::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(38,222,129,.4);animation:ripple 2s ease-out infinite}
 /* Accuracy circle pulse */
 .accCircle{border-radius:50%;background:rgba(77,171,247,.08);border:1.5px solid rgba(77,171,247,.22)}
+
+/* ══ EMERGA AGENT ══ */
+.emerga-agent{position:absolute;bottom:85px;right:15px;width:70px;height:80px;background:#141b2d;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9000;box-shadow:0 4px 15px rgba(0,0,0,0.5);cursor:pointer;transition:transform .2s;border:1px solid rgba(255,255,255,0.05)}
+.emerga-agent:active{transform:scale(0.95)}
+.emerga-icon{width:34px;height:34px;background:linear-gradient(135deg,#ff1744,#d50000);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;box-shadow:0 0 10px rgba(255,23,68,0.4)}
+.emerga-icon svg{width:20px;height:20px;fill:none;stroke:white;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.emerga-text{font-size:10px;font-family:var(--fD);font-weight:900;letter-spacing:1px;color:#fff}
+.emerga-agent.listening .emerga-icon{animation:emergaFlicker 1.5s infinite alternate}
+@keyframes emergaFlicker{
+  0%{box-shadow:0 0 5px #ff1744,0 0 10px #ff1744;transform:scale(1)}
+  100%{box-shadow:0 0 20px #ff1744,0 0 35px #ff1744;transform:scale(1.05)}
+}
 </style>
 </head>
 <body>
@@ -811,6 +823,14 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
   <div class="navActions">
     <button class="btnSec" style="flex:1;padding:11px;font-size:13px;background:var(--red);color:#fff;border-color:var(--red)" onclick="abortTrip()">✕ End Trip</button>
     <button class="btnArrive" onclick="arrive()">Arrive at Destination →</button>
+  </div>
+  
+  <!-- Emerga Agent Badge -->
+  <div class="emerga-agent" id="emergaAgent" onclick="toggleEmerga()">
+    <div class="emerga-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <div class="emerga-text">EMERGA</div>
   </div>
 </div>
 
@@ -1774,21 +1794,35 @@ function drawDirectionsOnNavMap(result){
   APP._routeMarkers.push(mDest);
 
   // Store step names for banner use
-  APP._stepNames = steps.map((s, i) => s.name || ('INT-' + i));
+  APP._stepNames = steps.map((s, i) => s.name || ('Step ' + i));
 
-  steps.forEach((step, i) => {
-    if(i === 0 || i === steps.length - 1) return;
-    const pt = step.maneuver.location; // [lng, lat]
-    const intLabel = step.name ? step.name.split(' ').slice(0,3).join(' ') : ('INT-'+i);
-    const jIcon = L.divIcon({
-        className: 'custom-div-icon',
-        html: `<div style="background:rgba(7,9,13,.88);border:1px solid #28344a;color:#8899aa;font-size:9px;font-family:'JetBrains Mono',monospace;padding:2px 6px;border-radius:3px;letter-spacing:.5px;white-space:nowrap">INT-${i} · ${intLabel}</div>`,
-        iconSize: [80, 16],
-        iconAnchor: [40, 8]
-    });
-    const mInt = L.marker([pt[1], pt[0]], {icon: jIcon}).addTo(APP.navMap);
-    APP._routeMarkers.push(mInt);
-  });
+  if (APP.routeId && APP.serverRoutes) {
+      const activeRoute = APP.serverRoutes.find(r => r.id === APP.routeId);
+      if (activeRoute && activeRoute.intersections) {
+          fetch(SERVER_URL + '/api/intersections')
+              .then(r => r.json())
+              .then(data => {
+                  const srvInts = {};
+                  const pts = Array.isArray(data) ? data : (data.intersections || []);
+                  pts.forEach(p => srvInts[p.id] = p);
+                  APP._srvIntMap = srvInts; // global cache for banner
+                  activeRoute.intersections.forEach((intId, idx) => {
+                      const intData = srvInts[intId];
+                      if (!intData) return;
+                      const seqNum = idx + 1;
+                      const intLabel = intData.name || intId;
+                      const jIcon = L.divIcon({
+                          className: 'custom-div-icon',
+                          html: `<div style="background:rgba(7,9,13,.88);border:1px solid #28344a;color:#8899aa;font-size:9px;font-family:'JetBrains Mono',monospace;padding:2px 6px;border-radius:3px;letter-spacing:.5px;white-space:nowrap">Junction ${seqNum} · ${intLabel}</div>`,
+                          iconSize: [80, 16],
+                          iconAnchor: [40, 8]
+                      });
+                      const mInt = L.marker([intData.lat, intData.lon], {icon: jIcon}).addTo(APP.navMap);
+                      APP._routeMarkers.push(mInt);
+                  });
+              }).catch(e => console.warn("Failed to fetch intersections", e));
+      }
+  }
 
   if(steps[0]) announceStep(steps[0]);
   APP.navMap.fitBounds(coords);
@@ -1829,15 +1863,17 @@ function startNavTimer(){
     const distRem = Math.max(0, Math.round(totalDist * (1 - APP.navProgress / 100)));
     const distDisp = distRem > 999 ? (distRem / 1000).toFixed(1) : distRem;
     const distUnit = distRem > 999 ? ' km' : ' m';
-    const bDistEl = document.getElementById('bDist');
-    const bEtaEl  = document.getElementById('bEta');
-    if(bDistEl) bDistEl.textContent = distDisp;
-    if(bEtaEl)  bEtaEl.textContent  = distRem > 0
-      ? 'ETA ~' + (distRem > 999 ? Math.ceil(distRem / 1000 / 0.8) + ' min' : Math.ceil(distRem / 14) + ' sec')
-      : 'Arriving…';
-    // Update distance unit in the span next to distBig
-    const distUnitEl = bDistEl?.nextElementSibling;
-    if(distUnitEl && distUnitEl.classList.contains('distUnit')) distUnitEl.textContent = distUnit;
+    if (!document.getElementById('intBanner')?.dataset.serverControlled) {
+      const bDistEl = document.getElementById('bDist');
+      const bEtaEl  = document.getElementById('bEta');
+      if(bDistEl) bDistEl.textContent = distDisp;
+      if(bEtaEl)  bEtaEl.textContent  = distRem > 0
+        ? 'ETA ~' + (distRem > 999 ? Math.ceil(distRem / 1000 / 0.8) + ' min' : Math.ceil(distRem / 14) + ' sec')
+        : 'Arriving…';
+      // Update distance unit in the span next to distBig
+      const distUnitEl = bDistEl?.nextElementSibling;
+      if(distUnitEl && distUnitEl.classList.contains('distUnit')) distUnitEl.textContent = distUnit;
+    }
 
     // Update approaching banner name from real route steps (not address)
     if(APP._navSteps && APP._navSteps.length > 1){
@@ -1849,7 +1885,7 @@ function startNavTimer(){
       const bannerEl = document.getElementById('intBanner');
       const bStatusEl = document.getElementById('bStatus');
       if(bNameEl && nxStep && !document.getElementById('intBanner')?.dataset.serverControlled){
-        const intName = nxStep.name ? ('INT-' + (nextI) + ' · ' + nxStep.name.split(',')[0]) : ('INT-' + nextI);
+        const intName = nxStep.name ? ('Turn ' + (nextI) + ' · ' + nxStep.name.split(',')[0]) : ('Turn ' + nextI);
         bNameEl.textContent = intName;
         if(bannerEl) bannerEl.className = 'intBanner approaching';
         if(bStatusEl) bStatusEl.textContent = '⬤  APPROACHING';
@@ -1979,6 +2015,17 @@ function confirmSOS(){
   toast('🚨 SOS SENT — All units notified');
   if(!APP.muted) speak('S.O.S. activated. Connecting to dispatch now.');
   if(navigator.vibrate) navigator.vibrate([300,150,300,150,300]);
+  
+  // Forward the SOS status to the backend server dispatch
+  fetch(SERVER_URL+'/api/sos',{
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      amb_id: APP.ambId,
+      lat: APP.gps?.lat,
+      lon: APP.gps?.lng
+    })
+  }).catch(e => console.warn('SOS delivery to server failed', e));
 }
 
 /* ═══════════════════════════════════════
@@ -2193,10 +2240,7 @@ socket.on('init', data=>{
 socket.on('analytics', data=>{
   if(data.amb_id !== APP.ambId) return;
   // Update ETA on nav screen
-  if(data.eta_str){
-    const etaEl = document.getElementById('navEta');
-    if(etaEl) etaEl.textContent = data.eta_str;
-  }
+  // (Removed: We no longer let the server overwrite the smart local ETA. Server sends high values when the vehicle stops).
   // Update server stats
   if(data.stats){ APP.serverStats = data.stats; updateHomeStats(data.stats); }
   // Update intersection banner from live data
@@ -2269,25 +2313,42 @@ function updateBannerFromServer(intersections){
   const bName   = document.getElementById('bName');
   const bDist   = document.getElementById('bDist');
   if(!banner || !bStatus || !bName) return;
+
+  const formatDist = (distVal) => {
+    if(distVal == null || !bDist) return;
+    const unitEl = bDist.nextElementSibling;
+    if (distVal > 999) {
+        bDist.textContent = (distVal / 1000).toFixed(1);
+        if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' km';
+    } else {
+        bDist.textContent = distVal;
+        if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' m';
+    }
+  };
+
   if(over){
     // Mark as server-controlled so the timer doesn't overwrite it
     banner.dataset.serverControlled = '1';
     banner.className = 'intBanner clearing';
     bStatus.textContent = '🔴 CLEARING';
-    // Show intersection name, never the GPS address
-    bName.textContent   = target.id + ' · ' + (target.name || 'Junction');
-    if(bDist && target.distance != null) bDist.textContent = target.distance;
+    // Show intersection name mapping sequentially
+    const seqT = APP._routeIntIds ? (APP._routeIntIds.indexOf(target.id)+1) : 0;
+    const prefixT = seqT > 0 ? ('Junction ' + seqT) : target.id;
+    bName.textContent   = prefixT + ' · ' + (target.name || 'Junction');
+    formatDist(target.distance);
     const bEta = document.getElementById('bEta');
     if(bEta && target.override_duration) bEta.textContent = 'Override: ' + target.override_duration + 's';
   } else {
-    // Release server control when no override so timer can update
-    delete banner.dataset.serverControlled;
+    // Keep server control active when approaching any route intersection
+    banner.dataset.serverControlled = '1';
     const nearest = intersections.reduce((a,b)=>((a.distance||9999)<(b.distance||9999)?a:b));
     banner.className = 'intBanner approaching';
     bStatus.textContent = '⬤ APPROACHING';
-    // Use the server intersection name (not GPS reverse geocode address)
-    bName.textContent   = nearest.id + ' · ' + (nearest.name || 'Junction');
-    if(bDist && nearest.distance != null) bDist.textContent = nearest.distance;
+    // Use sequential numbering mapped from route order
+    const seqN = APP._routeIntIds ? (APP._routeIntIds.indexOf(nearest.id)+1) : 0;
+    const prefixN = seqN > 0 ? ('Junction ' + seqN) : nearest.id;
+    bName.textContent   = prefixN + ' · ' + (nearest.name || 'Junction');
+    formatDist(nearest.distance);
   }
 }
 
@@ -2628,7 +2689,7 @@ function updateIntersectionList(route){
         const hwBadge = int.hardware ? ' 📡' : '';
         return `
           <div class="intItem ${int.state==='NORMAL'&&int.locked_by?'cleared':''}" id="srvInt_${int.id}">
-            <div class="intN">${int.id}</div>
+            <div class="intN">${idx + 1}</div>
             <div class="intDot ${state}"></div>
             <div class="intNm">${int.name}${hwBadge}</div>
             <div class="intD">${int.overrides_today} overrides today</div>
@@ -2715,6 +2776,291 @@ window.addEventListener('DOMContentLoaded',()=>{
 <!-- Config and Auth Logic -->
 <script src="/static/firebase-config.js"></script>
 <script src="/static/auth.js"></script>
+
+<!-- NavPath Bug Fix Patch -->
+<script>
+console.log('[NavPath] Bug fix patch loaded — ETA, timer, distance, and banner issues resolved');
+
+// Bug 1: NEW clean formatter without floats
+window.fmtEta = function(seconds) {
+    if(!seconds || seconds <= 0) return '0m 00s';
+    const totalSec = Math.round(seconds);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return m + 'm ' + (s < 10 ? '0' : '') + s + 's';
+};
+
+// Bug 2: drawDirectionsOnNavMap overrides
+const _old_draw = window.drawDirectionsOnNavMap;
+window.drawDirectionsOnNavMap = function(result) {
+    if(_old_draw) _old_draw(result);
+    // Hard override values with integers to prevent Bug 1
+    if(result && result.routes && result.routes[0]) {
+        const route = result.routes[0];
+        APP.navEtaSec = Math.round(route.duration);
+        APP.navTotalSec = Math.round(route.duration);
+        APP.navTotalDist = Math.round(route.distance);
+        
+        const m = Math.floor(APP.navEtaSec / 60);
+        const etaStr = window.fmtEta(APP.navEtaSec);
+        
+        const elEta = document.getElementById('navEta');
+        if(elEta) elEta.textContent = etaStr;
+        
+        const elMin = document.getElementById('etaMin');
+        if(elMin) elMin.textContent = etaStr;
+        
+        const bEta = document.getElementById('bEta');
+        if(bEta) bEta.textContent = 'ETA ~' + m + ' min';
+    }
+
+    // Only start the timer AFTER route is drawn
+    if (!APP._navTimerRunning) {
+        window.startNavTimer();
+    }
+};
+
+// Bug 2 & 3 & 4: startNavTimer override
+window.startNavTimer = function() {
+    if (APP.navTimer) clearInterval(APP.navTimer);
+    APP._navTimerRunning = true; // Guard flag set
+    
+    APP.navProgress = 0;
+    // Force integer total
+    APP.navTotalSec = Math.round(APP.navEtaSec || 574);
+    const totalSec  = APP.navTotalSec;
+    const totalDist = Math.round(APP.navTotalDist || (totalSec * 14));
+    let lastStepIdx = -1;
+
+    APP.navTimer = setInterval(() => {
+        // 1. Calculate and update Speed first
+        const spd = APP.gps?.speed != null ? Math.round(APP.gps.speed * 3.6)
+                  : (APP.gpsMode === 'sim' ? 45 + Math.floor(Math.random() * 30) : 0);
+        const elSpd = document.getElementById('navSpd');
+        if(elSpd) {
+            elSpd.textContent = spd;
+            elSpd.classList.toggle('hot', spd > 80);
+        }
+
+        // 2. Only tick down ETA (and make progress) if speed > 0
+        if (spd > 0) {
+            if(APP.navEtaSec > 0) APP.navEtaSec = Math.max(0, APP.navEtaSec - 1);
+        }
+        
+        APP.navProgress = Math.min(((totalSec - APP.navEtaSec) / totalSec) * 100, 100);
+
+        // Bug 1: clean formatting
+        const uiEta = document.getElementById('navEta');
+        if (uiEta) uiEta.textContent = window.fmtEta(APP.navEtaSec);
+
+        const rpFill = document.getElementById('rpFill');
+        if(rpFill) rpFill.style.width = APP.navProgress.toFixed(1) + '%';
+        const rpLabel = document.getElementById('rpLabel');
+        if(rpLabel) rpLabel.textContent = Math.round(APP.navProgress) + '%';
+
+        // Bug 3: Proper distance unit update + overflow fix
+        const distRem = Math.max(0, Math.round(totalDist * (1 - APP.navProgress / 100)));
+        const bDistEl = document.getElementById('bDist');
+        if (bDistEl) {
+            const unitEl = bDistEl.nextElementSibling;
+            if (distRem > 999) {
+                bDistEl.textContent = (distRem / 1000).toFixed(1);
+                if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' km';
+            } else {
+                bDistEl.textContent = distRem;
+                if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' m';
+            }
+        }
+
+        const bEtaEl = document.getElementById('bEta');
+        if(bEtaEl) {
+            const mins = Math.ceil(APP.navEtaSec / 60);
+            bEtaEl.textContent = distRem > 0 ? 'ETA ~' + mins + ' min' : 'Arriving...';
+        }
+
+        // Bug 4: Fix Intersection banner flickering based on step.name
+        let bannerIntText = null;
+        if (APP.routeId && APP.serverRoutes && APP._srvIntMap) {
+            const activeRoute = APP.serverRoutes.find(r => r.id === APP.routeId);
+            if (activeRoute && activeRoute.intersections && activeRoute.intersections.length > 0) {
+                const t = APP.navProgress / 100;
+                const ints = activeRoute.intersections;
+                const nextI = Math.min(Math.floor(t * ints.length) + 1, ints.length - 1);
+                const intId = ints[nextI];
+                const iName = APP._srvIntMap[intId]?.name || 'Junction';
+                bannerIntText = intId + ' · ' + iName;
+            }
+        }
+        
+        // Fallback to OSRM steps if no server route selected (e.g. ad-hoc map tap)
+        if (!bannerIntText && APP._navSteps && APP._navSteps.length > 1) {
+            const t = APP.navProgress / 100;
+            const stepI = Math.min(Math.floor(t * APP._navSteps.length), APP._navSteps.length - 1);
+            const nextI = Math.min(stepI + 1, APP._navSteps.length - 1);
+            const nxStep = APP._navSteps[nextI];
+            const roadName = nxStep.name ? nxStep.name.split(',')[0] : 'Junction';
+            bannerIntText = 'Step ' + nextI + ' · ' + roadName;
+        }
+
+        const banner = document.getElementById('intBanner');
+        if (bannerIntText && banner && !banner.dataset.serverControlled) {
+            const bNameEl = document.getElementById('bName');
+            const bStatusEl = document.getElementById('bStatus');
+            
+            if (bNameEl && bNameEl.textContent !== bannerIntText) {
+                bNameEl.textContent = bannerIntText;
+            }
+            if (banner.className !== 'intBanner approaching') {
+                banner.className = 'intBanner approaching';
+            }
+            if (bStatusEl && bStatusEl.textContent !== '⬤  APPROACHING') {
+                bStatusEl.textContent = '⬤  APPROACHING';
+            }
+        }
+
+        // Marker & Voice
+        if(APP.navRoute && APP.navRoute.length > 1 && APP.navMarker){
+            const t = APP.navProgress / 100;
+            const segs = APP.navRoute.length - 1;
+            const si = Math.max(0, Math.min(Math.floor(t * segs), segs - 1));
+            const lt = t * segs - si;
+            const a = APP.navRoute[si], b = APP.navRoute[si + 1];
+            const newPos = [ a.lat + (b.lat - a.lat) * lt, a.lng + (b.lng - a.lng) * lt ];
+            
+            if(APP.gpsMode !== 'real') {
+                APP.navMarker.setLatLng(newPos);
+                if(APP.navMap) APP.navMap.panTo(newPos);
+            }
+
+            if(APP._navSteps && APP._navSteps.length){
+                const stepIdx = Math.min(Math.floor(t * APP._navSteps.length), APP._navSteps.length - 1);
+                if(stepIdx !== lastStepIdx){
+                    lastStepIdx = stepIdx;
+                    if(typeof announceStep === 'function') announceStep(APP._navSteps[stepIdx]);
+                }
+            }
+        }
+
+        if(APP.navEtaSec <= 0) {
+            clearInterval(APP.navTimer);
+            APP.navTimer = null;
+            APP._navTimerRunning = false;
+            if(typeof arrive === 'function') arrive();
+        }
+    }, 1000);
+};
+
+// goTo override: resets timer guard on screen change
+const _old_goTo = window.goTo;
+window.goTo = function(screenId) {
+    if (screenId === 'sHome' || screenId === 'sComplete' || screenId === 'sRoute') {
+        APP._navTimerRunning = false;
+        if (APP.navTimer) {
+            clearInterval(APP.navTimer);
+            APP.navTimer = null;
+        }
+    }
+    if (_old_goTo) _old_goTo(screenId);
+};
+
+// previewRoute override: uses fmtEta for Route screen
+const _old_previewRoute = window.previewRoute;
+window.previewRoute = function(destCoord) {
+    if(!APP.gps || !destCoord) return;
+    const url = `https://router.project-osrm.org/route/v1/driving/${APP.gps.lng},${APP.gps.lat};${destCoord.lng},${destCoord.lat}?overview=full&geometries=geojson&steps=true`;
+    fetch(url).then(r=>r.json()).then(res=>{
+        if(res.code !== 'Ok') return;
+        const route = res.routes[0];
+        const roundedDur = Math.round(route.duration);
+        const manualDur = Math.round(roundedDur * 1.35); // 35% slower without NavPath (dynamic)
+        const savedDur = manualDur - roundedDur;
+        
+        const etaMinEl = document.getElementById('etaMin');
+        if(etaMinEl) etaMinEl.textContent = window.fmtEta(roundedDur);
+        
+        const etaVsEl = document.getElementById('etaVs');
+        if(etaVsEl) etaVsEl.textContent = 'vs ' + window.fmtEta(manualDur) + ' without NavPath';
+        
+        const etaSavedEl = document.getElementById('etaSaved');
+        if(etaSavedEl) etaSavedEl.textContent = '⚡ ~' + window.fmtEta(savedDur);
+        
+        const distStr = route.distance > 1000 ? (route.distance/1000).toFixed(1)+' km' : Math.round(route.distance)+' m';
+        const etaDistEl = document.getElementById('etaDist');
+        if(etaDistEl) etaDistEl.textContent = distStr;
+        APP._pendingDirectionsResult = res;
+    }).catch(e => console.warn(e));
+};
+
+/* ═══════════════════════════════════════
+   EMERGA VOICE AGENT
+═══════════════════════════════════════ */
+let emergaRecognition = null;
+let emergaActive = false;
+
+window.initEmerga = function() {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+        console.warn('Speech Recognition not supported in this browser.');
+        return;
+    }
+    emergaRecognition = new SpeechRec();
+    emergaRecognition.continuous = true;
+    emergaRecognition.interimResults = false;
+    
+    emergaRecognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+        console.log('[Emerga] Heard: ', transcript);
+        if (transcript.includes('critical')) {
+            setPrio('critical');
+        } else if (transcript.includes('urgent')) {
+            setPrio('urgent');
+        } else if (transcript.includes('routine')) {
+            setPrio('routine');
+        } else if (transcript.includes('sos')) {
+            setPrio('critical');
+            doSOS(); 
+        }
+    };
+    
+    emergaRecognition.onstart = () => {
+        const ag = document.getElementById('emergaAgent');
+        if(ag) ag.classList.add('listening');
+        toast('🎙️ Emerga listening...');
+    };
+    
+    emergaRecognition.onend = () => {
+        if(emergaActive) {
+            try { emergaRecognition.start(); } catch(e){}
+        } else {
+            const ag = document.getElementById('emergaAgent');
+            if(ag) ag.classList.remove('listening');
+        }
+    };
+};
+
+window.toggleEmerga = function() {
+    if(!emergaRecognition) {
+        initEmerga();
+        if(!emergaRecognition) {
+            toast('Voice recognition not supported');
+            return;
+        }
+    }
+    emergaActive = !emergaActive;
+    if(emergaActive) {
+        try { emergaRecognition.start(); } catch(e){}
+    } else {
+        emergaRecognition.stop();
+        const ag = document.getElementById('emergaAgent');
+        if(ag) ag.classList.remove('listening');
+        toast('Emerga voice agent paused.');
+    }
+};
+
+// Auto-init silently
+setTimeout(() => window.initEmerga(), 2000);
+
+</script>
 
 </body>
 </html>
