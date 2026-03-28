@@ -142,6 +142,46 @@ INTERSECTIONS = {
         "overrides_today": 0,
         "avg_duration":    30,
         "power":           "main"
+    },
+    "INT-5": {
+        "id":       "INT-5",
+        "name":     "Pragati Maidan / Supreme Court",
+        "lat":      28.6180,
+        "lon":      77.2430,
+        "hardware": False,
+        "overrides_today": 0,
+        "avg_duration":    55,
+        "power":           "main"
+    },
+    "INT-6": {
+        "id":       "INT-6",
+        "name":     "ITO Intersection",
+        "lat":      28.6295,
+        "lon":      77.2405,
+        "hardware": False,
+        "overrides_today": 0,
+        "avg_duration":    65,
+        "power":           "main"
+    },
+    "INT-7": {
+        "id":       "INT-7",
+        "name":     "Delhi Gate Intersection",
+        "lat":      28.6380,
+        "lon":      77.2390,
+        "hardware": False,
+        "overrides_today": 0,
+        "avg_duration":    45,
+        "power":           "main"
+    },
+    "INT-8": {
+        "id":       "INT-8",
+        "name":     "JLN Marg (LNJP)",
+        "lat":      28.6385,
+        "lon":      77.2372,
+        "hardware": False,
+        "overrides_today": 0,
+        "avg_duration":    35,
+        "power":           "main"
     }
 }
 
@@ -190,6 +230,20 @@ ROUTES = {
         "navpath_eta":   "3:50",
         "manual_eta":    "6:10",
         "time_saved":    "2:20"
+    },
+    "ROUTE-4": {
+        "id":            "ROUTE-4",
+        "name":          "Bharat Mandapam → Lok Nayak Hospital",
+        "origin":        "Bharat Mandapam",
+        "destination":   "Lok Nayak Hospital",
+        "origin_lat":    28.6186,
+        "origin_lon":    77.2435,
+        "dest_lat":      28.6385,
+        "dest_lon":      77.2372,
+        "intersections": ["INT-5", "INT-6", "INT-7", "INT-8"],
+        "navpath_eta":   "8:12",
+        "manual_eta":    "11:25",
+        "time_saved":    "3:13"
     }
 }
 
@@ -637,6 +691,26 @@ def get_system_health():
         "security_events": 4,
         "modules":        modules
     })
+
+# [INTEGRATION] /api/sos — allows an ambulance to explicitly broadcast a critical SOS emergency
+@app.route('/api/sos', methods=['POST'])
+def receive_sos():
+    data = request.get_json() or {}
+    amb_id = data.get("amb_id", "UNKNOWN")
+    log_event("SOS", f"🚨 CRITICAL SOS TRIGGERED by {amb_id}!", amb_id=amb_id)
+    
+    if amb_id in ambulances:
+        ambulances[amb_id]['priority'] = 'SOS'
+        
+    socketio.emit('event', {
+        "ts": time.time(),
+        "type": "SOS",
+        "msg": f"🚨 EMERGENCY: SOS ACTIVATED by {amb_id}",
+        "amb_id": amb_id,
+        "lat": data.get("lat"),
+        "lon": data.get("lon")
+    })
+    return jsonify({"status": "sos_received"})
 
 # [INTEGRATION] /api/gps — receives live GPS from ambulance app
 @app.route('/api/gps', methods=['POST'])
