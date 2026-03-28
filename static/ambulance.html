@@ -1114,7 +1114,10 @@ function clearNavState() {
   const bName = document.getElementById('bName');
   if(bName) bName.textContent = 'Calculating route…';
   const banner = document.getElementById('intBanner');
-  if(banner) banner.className = 'intBanner approaching';
+  if(banner) {
+      banner.className = 'intBanner approaching';
+      delete banner.dataset.serverControlled;
+  }
   if(APP.navPolyline) APP.navPolyline.setLatLngs([]);
   if(APP.navMap && APP._routeMarkers) {
     APP._routeMarkers.forEach(m => APP.navMap.removeLayer(m));
@@ -2245,7 +2248,7 @@ socket.on('analytics', data=>{
   if(data.stats){ APP.serverStats = data.stats; updateHomeStats(data.stats); }
   // Update intersection banner from live data
   if(data.intersections){
-    updateBannerFromServer(data.intersections, data.active_int_idx);
+    updateBannerFromServer(data.intersections);
     updateRouteIntListFromAnalytics(data.intersections); // live route screen updates
   }
 });
@@ -2302,25 +2305,17 @@ function updateHomeStats(stats){
 }
 
 /* ─── Update intersection banner from server analytics payload ─── */
-function updateBannerFromServer(intersections, activeIdx){
+function updateBannerFromServer(intersections){
   if(!intersections || !intersections.length) return;
-  
-  // The server sends intersections in route order.
-  const idx = activeIdx != null ? Math.min(activeIdx, intersections.length - 1) : 0;
-  
   // Find the first OVERRIDE intersection
   const over = intersections.find(i => i.state === 'OVERRIDE');
-  const target = over || intersections[idx];
+  const target = over || intersections[0];
   if(!target) return;
-  
   const banner = document.getElementById('intBanner');
   const bStatus = document.getElementById('bStatus');
   const bName   = document.getElementById('bName');
   const bDist   = document.getElementById('bDist');
   if(!banner || !bStatus || !bName) return;
-
-  const targetIdx = intersections.findIndex(i => i.id === target.id);
-  const seqN = targetIdx >= 0 ? targetIdx + 1 : (idx + 1);
 
   const formatDist = (distVal) => {
     if(distVal == null || !bDist) return;
@@ -2334,27 +2329,29 @@ function updateBannerFromServer(intersections, activeIdx){
     }
   };
 
-  banner.dataset.serverControlled = '1';
-  bName.textContent = 'Junction ' + seqN + ' · ' + (target.name || target.id);
-  formatDist(target.distance);
-
   if(over){
+    // Mark as server-controlled so the timer doesn't overwrite it
+    banner.dataset.serverControlled = '1';
     banner.className = 'intBanner clearing';
     bStatus.textContent = '🔴 CLEARING';
+    // Show intersection name mapping sequentially
+    const seqT = APP._routeIntIds ? (APP._routeIntIds.indexOf(target.id)+1) : 0;
+    const prefixT = seqT > 0 ? ('Junction ' + seqT) : target.id;
+    bName.textContent   = prefixT + ' · ' + (target.name || 'Junction');
+    formatDist(target.distance);
     const bEta = document.getElementById('bEta');
-    if(bEta && target.override_duration != null) bEta.textContent = 'Override: ' + target.override_duration + 's';
+    if(bEta && target.override_duration) bEta.textContent = 'Override: ' + target.override_duration + 's';
   } else {
+    // Keep server control active when approaching any route intersection
+    banner.dataset.serverControlled = '1';
+    const nearest = intersections.reduce((a,b)=>((a.distance||9999)<(b.distance||9999)?a:b));
     banner.className = 'intBanner approaching';
     bStatus.textContent = '⬤ APPROACHING';
-    const bEta = document.getElementById('bEta');
-    if(bEta) {
-      if (target.distance === 0) {
-          bEta.textContent = 'Arriving...';
-      } else {
-          const sec = Math.ceil(target.distance / 14);
-          bEta.textContent = sec > 60 ? 'ETA ~' + Math.ceil(sec/60) + ' min' : 'ETA ~' + sec + ' sec';
-      }
-    }
+    // Use sequential numbering mapped from route order
+    const seqN = APP._routeIntIds ? (APP._routeIntIds.indexOf(nearest.id)+1) : 0;
+    const prefixN = seqN > 0 ? ('Junction ' + seqN) : nearest.id;
+    bName.textContent   = prefixN + ' · ' + (nearest.name || 'Junction');
+    formatDist(nearest.distance);
   }
 }
 
@@ -2866,22 +2863,25 @@ window.startNavTimer = function() {
 
         // Bug 3: Proper distance unit update + overflow fix
         const distRem = Math.max(0, Math.round(totalDist * (1 - APP.navProgress / 100)));
-        const bDistEl = document.getElementById('bDist');
-        if (bDistEl) {
-            const unitEl = bDistEl.nextElementSibling;
-            if (distRem > 999) {
-                bDistEl.textContent = (distRem / 1000).toFixed(1);
-                if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' km';
-            } else {
-                bDistEl.textContent = distRem;
-                if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' m';
+        const bannerCheck = document.getElementById('intBanner');
+        if (!bannerCheck || !bannerCheck.dataset.serverControlled) {
+            const bDistEl = document.getElementById('bDist');
+            if (bDistEl) {
+                const unitEl = bDistEl.nextElementSibling;
+                if (distRem > 999) {
+                    bDistEl.textContent = (distRem / 1000).toFixed(1);
+                    if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' km';
+                } else {
+                    bDistEl.textContent = distRem;
+                    if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' m';
+                }
             }
-        }
 
-        const bEtaEl = document.getElementById('bEta');
-        if(bEtaEl) {
-            const mins = Math.ceil(APP.navEtaSec / 60);
-            bEtaEl.textContent = distRem > 0 ? 'ETA ~' + mins + ' min' : 'Arriving...';
+            const bEtaEl = document.getElementById('bEta');
+            if(bEtaEl) {
+                const mins = Math.ceil(APP.navEtaSec / 60);
+                bEtaEl.textContent = distRem > 0 ? 'ETA ~' + mins + ' min' : 'Arriving...';
+            }
         }
 
         // Bug 4: Fix Intersection banner flickering based on step.name
