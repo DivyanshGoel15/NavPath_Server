@@ -1,452 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>NavPath · Emergency Fleet v4</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-:root {
-  --bg:#07090d; --s1:#0e1318; --s2:#141a22; --s3:#1b2333;
-  --bd:#1e2736; --bd2:#28344a; --bd3:#2e3f55;
-  --red:#f03e3e; --red-dim:rgba(240,62,62,.12); --red-glow:rgba(240,62,62,.38);
-  --green:#26de81; --green-dim:rgba(38,222,129,.1); --green-glow:rgba(38,222,129,.3);
-  --yellow:#ffd43b; --yellow-dim:rgba(255,212,59,.1);
-  --blue:#4dabf7; --blue-dim:rgba(77,171,247,.1); --blue-glow:rgba(77,171,247,.3);
-  --cyan:#66d9e8; --orange:#fd7e14;
-  --txt:#edf2f7; --txt2:#8899aa; --txt3:#445566;
-  --r:14px; --rs:9px;
-  --fD:'Barlow Condensed',sans-serif;
-  --fM:'JetBrains Mono',monospace;
-  --fB:'Barlow',sans-serif;
-}
-:root.light-mode {
-  --bg:#f8f9fa; --s1:#ffffff; --s2:#f1f3f5; --s3:#e9ecef;
-  --bd:#dee2e6; --bd2:#ced4da; --bd3:#adb5bd;
-  --txt:#212529; --txt2:#495057; --txt3:#868e96;
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;width:100%;background:var(--bg);color:var(--txt);font-family:var(--fB);overflow:hidden;-webkit-font-smoothing:antialiased}
-input,button,select{font-family:inherit;outline:none}
-button{cursor:pointer;border:none;background:none}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+  <meta name="description" content="NavPath Emergency Fleet — ambulance driver interface with real-time navigation, priority management, and intersection override.">
+  <title>NavPath · Emergency Fleet v4</title>
 
-/* ── SCREENS ── */
-.screen{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
-.screen.active{display:flex;animation:scIn .25s cubic-bezier(.22,1,.36,1)}
-@keyframes scIn{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
-.scr{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column}
-.scr::-webkit-scrollbar{width:2px}
-.scr::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-/* ── ANIMS ── */
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(240,62,62,.6)}70%{box-shadow:0 0 0 8px rgba(240,62,62,0)}}
-@keyframes pulseG{0%,100%{opacity:1}50%{opacity:.3}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes ripple{0%{transform:scale(.8);opacity:.7}100%{transform:scale(2.4);opacity:0}}
-@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-@keyframes badgePop{from{transform:scale(0)}to{transform:scale(1)}}
-@keyframes hbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.08)}28%{transform:scale(1)}}
-@keyframes scanline{0%{top:-10%}100%{top:110%}}
-@keyframes gpsPulse{0%,100%{box-shadow:0 0 0 0 rgba(38,222,129,.7)}70%{box-shadow:0 0 0 10px rgba(38,222,129,0)}}
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-/* ══ NAV BAR ══ */
-#navBar{position:fixed;bottom:0;left:0;right:0;z-index:900;background:var(--s1);border-top:1px solid var(--bd2);display:none;height:60px;padding-bottom:env(safe-area-inset-bottom,0)}
-.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--txt3);transition:color .18s;font-family:var(--fM);font-size:8px;letter-spacing:.5px;text-transform:uppercase;position:relative}
-.nb svg{width:20px;height:20px;transition:all .2s}
-.nb.active{color:var(--blue)}
-.nb.active svg{filter:drop-shadow(0 0 6px var(--blue-glow))}
-.nb-dot{position:absolute;top:7px;right:calc(50% - 16px);width:7px;height:7px;border-radius:50%;background:var(--red);border:2px solid var(--s1);display:none}
-.nb-dot.show{display:block;animation:badgePop .3s cubic-bezier(.34,1.56,.64,1)}
-
-/* ══════════════════════════════
-   AUTH SCREEN
-══════════════════════════════ */
-#sLogin{
-  background:var(--bg);
-  background-image:radial-gradient(ellipse 80% 60% at 50% 110%,rgba(77,171,247,.08) 0%,transparent 65%),radial-gradient(ellipse 40% 30% at 80% 20%,rgba(240,62,62,.05) 0%,transparent 50%);
-  align-items:center;justify-content:center;padding:18px;overflow-y:auto;
-}
-#sLogin::before{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,.015) 2px,rgba(255,255,255,.015) 4px);z-index:0}
-#sLogin::after{content:'';position:absolute;left:0;right:0;height:40%;background:linear-gradient(transparent,rgba(77,171,247,.04),transparent);pointer-events:none;animation:scanline 5s linear infinite;z-index:0}
-.aShell{width:100%;max-width:400px;position:relative;z-index:1}
-.aLogo{text-align:center;margin-bottom:24px}
-.logo-badge{display:inline-flex;align-items:center;gap:7px;background:var(--red-dim);border:1px solid rgba(240,62,62,.25);border-radius:20px;padding:4px 13px;margin-bottom:12px}
-.logo-badge span{font-family:var(--fM);font-size:10px;color:var(--red);letter-spacing:2px;text-transform:uppercase}
-.lbPulse{width:6px;height:6px;border-radius:50%;background:var(--red);animation:pulse 1.4s infinite;flex-shrink:0}
-.aLogo h1{font-family:var(--fD);font-size:60px;font-weight:900;letter-spacing:-3px;line-height:1}
-.aLogo h1 em{font-style:normal;color:var(--red)}
-.aLogo p{font-family:var(--fM);font-size:10px;color:var(--txt3);letter-spacing:1px;margin-top:5px}
-.aCard{background:var(--s1);border:1px solid var(--bd2);border-radius:var(--r);padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.aTabs{display:flex;background:var(--s2);border-radius:var(--rs);padding:3px;margin-bottom:20px;gap:3px}
-.aTab{flex:1;padding:9px;border-radius:7px;text-align:center;font-family:var(--fD);font-size:15px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--txt3);transition:all .2s;cursor:pointer}
-.aTab.on{background:var(--red);color:white;box-shadow:0 2px 14px var(--red-glow)}
-.aForm{display:none;flex-direction:column;gap:13px;animation:slideDown .2s ease}
-.aForm.on{display:flex}
-.fGrp{display:flex;flex-direction:column;gap:5px}
-.fRow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.fLbl{font-family:var(--fM);font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:1.5px;display:flex;align-items:center;gap:4px}
-.fLbl .req{color:var(--red)}
-.fIn{background:var(--s2);border:1.5px solid var(--bd2);border-radius:var(--rs);padding:12px 14px;color:var(--txt);font-size:15px;transition:border .2s,box-shadow .2s;width:100%}
-.fIn:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(77,171,247,.1)}
-.fIn.ok{border-color:var(--green)}
-.fIn.bad{border-color:var(--red);animation:shake .3s ease}
-.fIn::placeholder{color:var(--txt3);font-size:13px}
-select.fIn{appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23445566' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center}
-select.fIn option{background:var(--s2)}
-.pwWrap{position:relative}
-.pwWrap .fIn{padding-right:44px}
-.pwEye{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--txt3);padding:4px;transition:color .15s}
-.pwEye:hover{color:var(--cyan)}
-/* PIN */
-.pinWrap{display:flex;flex-direction:column;gap:9px}
-.pinDots{display:flex;gap:10px;justify-content:center;margin:2px 0}
-.pd{width:14px;height:14px;border-radius:50%;border:2px solid var(--bd2);transition:all .18s;flex-shrink:0}
-.pd.on{background:var(--blue);border-color:var(--blue);box-shadow:0 0 12px var(--blue-glow);transform:scale(1.15)}
-.numG{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-.nk{padding:13px;border-radius:var(--rs);background:var(--s2);border:1.5px solid var(--bd);font-family:var(--fD);font-size:22px;font-weight:800;color:var(--txt);transition:all .12s;user-select:none;text-align:center;cursor:pointer}
-.nk:hover{border-color:var(--blue);background:var(--s3)}
-.nk:active{transform:scale(.93)}
-.nk.del{color:var(--red);font-size:15px}
-/* Buttons */
-.btnAuth{width:100%;padding:15px;border-radius:var(--rs);background:var(--red);color:white;font-family:var(--fD);font-size:19px;font-weight:900;letter-spacing:2px;text-transform:uppercase;box-shadow:0 4px 22px var(--red-glow);transition:all .18s;margin-top:4px;position:relative;overflow:hidden;border:none}
-.btnAuth::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,transparent 50%)}
-.btnAuth:hover{transform:translateY(-2px);box-shadow:0 8px 30px var(--red-glow)}
-.btnAuth:active{transform:scale(.98)}
-.aErr{background:var(--red-dim);border:1px solid rgba(240,62,62,.3);border-radius:var(--rs);padding:9px 13px;font-size:12px;color:var(--red);display:none;animation:slideDown .2s ease;font-family:var(--fM)}
-.aInfo{background:var(--blue-dim);border:1px solid rgba(77,171,247,.3);border-radius:var(--rs);padding:9px 13px;font-size:12px;color:var(--cyan);display:none;animation:slideDown .2s ease;font-family:var(--fM)}
-.forgotLink{text-align:center;font-family:var(--fM);font-size:10px;color:var(--txt3);cursor:pointer;transition:color .15s}
-.forgotLink:hover{color:var(--cyan)}
-
-/* Forgot Password Modal */
-.fpOverlay{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)}
-.fpOverlay.show{display:flex;animation:fadeIn .2s ease}
-.fpBox{background:var(--s1);border:1.5px solid var(--bd2);border-radius:var(--r);padding:26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-.fpHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.fpHead h3{font-family:var(--fD);font-size:22px;font-weight:900;letter-spacing:.5px}
-.fpClose{width:30px;height:30px;border-radius:6px;background:var(--s2);border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--txt3);font-size:16px;transition:all .15s}
-.fpClose:hover{border-color:var(--red);color:var(--red)}
-.fpStep{display:none;flex-direction:column;gap:12px;animation:slideDown .2s ease}
-.fpStep.on{display:flex}
-.fpIco{text-align:center;font-size:38px;margin-bottom:4px}
-.fpDesc{text-align:center;font-family:var(--fM);font-size:10px;color:var(--txt3);line-height:1.7;letter-spacing:.5px}
-.fpUserInfo{background:var(--green-dim);border:1px solid rgba(38,222,129,.25);border-radius:var(--rs);padding:11px 13px;display:flex;align-items:center;gap:9px}
-.fpUserInfo .fuIco{font-size:20px}
-.fpUserInfo .fuName{font-size:14px;font-weight:600;color:var(--green)}
-.fpUserInfo .fuId{font-family:var(--fM);font-size:10px;color:var(--txt3)}
-
-/* ══════════════════════════════
-   HOME SCREEN
-══════════════════════════════ */
-#sHome{padding-bottom:60px}
-.hTopbar{background:linear-gradient(135deg,var(--s1) 0%,rgba(14,19,24,.96) 100%);border-bottom:1px solid var(--bd2);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px}
-.driverInfo .dAmb{font-family:var(--fM);font-size:10px;color:var(--cyan);letter-spacing:.5px}
-.driverInfo .dName{font-family:var(--fD);font-size:22px;font-weight:800;letter-spacing:.3px;line-height:1}
-.hClock{display:flex;flex-direction:column;align-items:center}
-.hClock .cTime{font-family:var(--fM);font-size:17px;font-weight:700;letter-spacing:1px;line-height:1}
-.hClock .cDate{font-family:var(--fM);font-size:8px;color:var(--txt3);letter-spacing:.5px;margin-top:1px}
-.hRight{display:flex;align-items:center;gap:6px}
-.connPill{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-family:var(--fM);font-size:9px;letter-spacing:.5px;border:1px solid;transition:all .3s}
-.connPill.live{background:var(--green-dim);border-color:rgba(38,222,129,.2);color:var(--green)}
-.connPill.offline{background:var(--red-dim);border-color:rgba(240,62,62,.2);color:var(--red)}
-.cDot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulseG 2s infinite}
-.shiftBadge{display:flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--bd2);border-radius:20px;padding:5px 10px;font-family:var(--fM);font-size:10px;color:var(--cyan)}
-.hBody{padding:13px 15px;display:flex;flex-direction:column;gap:11px;flex:1}
-
-/* Map widget */
-.mapWidget{border-radius:var(--r);overflow:hidden;border:1px solid var(--bd2);flex:1;min-height:215px;position:relative;background:var(--s2)}
-#homeLeaflet{width:100%;height:100%}
-.mapHUD{position:absolute;top:8px;left:8px;z-index:500;display:flex;flex-direction:column;gap:4px;pointer-events:none}
-.mapHUD-R{position:absolute;top:8px;right:8px;z-index:500}
-.hudBadge{background:rgba(7,9,13,.9);backdrop-filter:blur(8px);border:1px solid var(--bd2);border-radius:6px;padding:4px 9px;font-family:var(--fM);font-size:9px;color:var(--txt2);display:flex;align-items:center;gap:5px}
-.hudBadge .hv{color:var(--cyan);font-weight:700}
-/* Address chip — MAIN GPS display */
-.addrChip{background:rgba(7,9,13,.9);backdrop-filter:blur(8px);border:1px solid var(--bd2);border-radius:6px;padding:5px 10px;font-family:var(--fM);font-size:9px;color:var(--txt2);display:flex;align-items:center;gap:6px;max-width:calc(100vw - 80px)}
-.addrChip .gpsDot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.addrChip .gpsDot.real{background:var(--green);animation:gpsPulse 2s infinite}
-.addrChip .gpsDot.sim{background:var(--yellow)}
-.addrChip .gpsDot.searching{background:var(--blue);animation:pulseG 1s infinite}
-.addrChip .addrTxt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:var(--txt)}
-.rcenterBtn{background:rgba(7,9,13,.9);backdrop-filter:blur(6px);border:1.5px solid var(--bd2);border-radius:6px;padding:7px 9px;cursor:pointer;color:var(--txt2);font-size:13px;transition:all .15s}
-.rcenterBtn:hover{border-color:var(--blue);color:var(--cyan)}
-.mapLoading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--s2);z-index:600;flex-direction:column;gap:9px}
-.mapSpin{width:28px;height:28px;border-radius:50%;border:2px solid var(--bd2);border-top-color:var(--blue);animation:spin 1s linear infinite}
-.mapLoadTxt{font-family:var(--fM);font-size:9px;color:var(--txt3);letter-spacing:1.5px}
-/* GPS denied overlay */
-.gpsDenied{position:absolute;inset:0;z-index:700;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(7,9,13,.95);border-radius:var(--r);gap:10px;padding:20px;text-align:center}
-.gpsDenied h4{font-family:var(--fD);font-size:18px;font-weight:800}
-.gpsDenied p{font-size:12px;color:var(--txt3);line-height:1.6;max-width:240px}
-.gpsDenied .gdBtn{padding:10px 22px;border-radius:var(--rs);background:var(--blue);color:white;font-family:var(--fD);font-size:15px;font-weight:800;letter-spacing:1px;cursor:pointer;border:none;box-shadow:0 4px 16px var(--blue-glow);margin-top:4px}
-.gpsDenied .gdSim{font-family:var(--fM);font-size:10px;color:var(--txt3);cursor:pointer;margin-top:4px;transition:color .15s}
-.gpsDenied .gdSim:hover{color:var(--cyan)}
-
-/* Speedometer */
-.statsRow{display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:8px;align-items:stretch}
-.scard{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 8px;text-align:center}
-.scard .sv{font-family:var(--fD);font-size:23px;font-weight:900;line-height:1;transition:color .3s}
-.scard .sl{font-family:var(--fM);font-size:8px;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
-.speedCard{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:8px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.spSvg{width:110px;height:66px;overflow:visible}
-.spTrack{fill:none;stroke:var(--s3);stroke-width:7;stroke-linecap:round}
-.spFill{fill:none;stroke:var(--cyan);stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .5s cubic-bezier(.4,0,.2,1),stroke .3s}
-.spVal{font-family:var(--fD);font-size:24px;font-weight:900;fill:var(--txt);text-anchor:middle}
-.spUnit{font-family:var(--fM);font-size:7.5px;fill:var(--txt3);text-anchor:middle}
-
-/* Info bar */
-.infoBar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.ibCard{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 11px;display:flex;align-items:center;gap:8px}
-.ibIco{font-size:17px;flex-shrink:0}
-.ibInfo .il{font-family:var(--fM);font-size:8px;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px}
-.ibInfo .iv{font-family:var(--fD);font-size:16px;font-weight:800;line-height:1.1}
-
-/* Battery */
-.batRow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.batCard{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:11px 13px;display:flex;align-items:center;gap:9px}
-.batIco{font-size:20px;flex-shrink:0}
-.batInfo .bl{font-family:var(--fM);font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px}
-.batInfo .bv{font-family:var(--fD);font-size:21px;font-weight:800;line-height:1.1;transition:color .3s}
-.batBar{height:4px;border-radius:2px;background:var(--s3);margin-top:5px;overflow:hidden}
-.batFill{height:100%;border-radius:2px;transition:width .8s ease,background .3s}
-
-/* Duty */
-.dutyRow{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
-.dutyInfo .dt{font-size:15px;font-weight:600}
-.dutyInfo .ds{font-size:11px;color:var(--txt3);font-family:var(--fM);margin-top:2px}
-.tog{width:48px;height:26px;border-radius:13px;background:var(--s3);border:1px solid var(--bd2);position:relative;cursor:pointer;transition:background .2s,border .2s,box-shadow .2s;flex-shrink:0}
-.tog.on{background:var(--green);border-color:var(--green);box-shadow:0 0 12px var(--green-glow)}
-.togK{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:white;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.5)}
-.tog.on .togK{transform:translateX(22px)}
-
-/* Trip history */
-.tripCard{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);overflow:hidden}
-.tripHdr{padding:11px 13px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .15s}
-.tripHdr:hover{background:var(--s2)}
-.tripBody{display:none;border-top:1px solid var(--bd)}
-.tripBody.open{display:block}
-.tripItem{padding:10px 13px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bd)}
-.tripItem:last-child{border-bottom:none}
-.tripBadge{width:30px;height:30px;border-radius:7px;background:var(--red-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
-.tripI{flex:1}
-.tripI .tr{font-size:13px;font-weight:600}
-.tripI .td{font-family:var(--fM);font-size:9px;color:var(--txt3);margin-top:2px}
-.tripSave{font-family:var(--fD);font-size:16px;font-weight:900;color:var(--green)}
-
-/* Quick actions */
-.qaGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.qaBtn{padding:12px;border-radius:var(--rs);border:1.5px solid var(--bd2);background:var(--s1);color:var(--txt2);font-family:var(--fD);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
-.qaBtn:hover{border-color:var(--blue);color:var(--cyan);background:var(--blue-dim)}
-.qaBtn.red:hover{border-color:var(--red);color:var(--red);background:var(--red-dim)}
-.sectionLbl{font-family:var(--fM);font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
-
-/* Emergency button */
-.emerWrap{position:relative;margin-top:auto}
-.emerGlow{position:absolute;inset:-10px;border-radius:var(--r);background:var(--red);opacity:.14;filter:blur(20px);animation:hbeat 2s ease-in-out infinite}
-.emerBtn{width:100%;padding:21px;border-radius:var(--r);background:var(--red);color:white;font-family:var(--fD);font-size:26px;font-weight:900;letter-spacing:4px;text-transform:uppercase;transition:all .18s;position:relative;overflow:hidden;border:none;box-shadow:0 0 0 4px rgba(240,62,62,.12),0 8px 32px var(--red-glow)}
-.emerBtn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,transparent 50%)}
-.emerBtn:hover{transform:translateY(-2px);box-shadow:0 0 0 6px rgba(240,62,62,.18),0 12px 40px var(--red-glow)}
-.emerBtn:active{transform:scale(.98)}
-
-/* ══════════════════════════════
-   ROUTE SCREEN
-══════════════════════════════ */
-#sRoute{padding-bottom:60px}
-.pageHdr{background:var(--s1);border-bottom:1px solid var(--bd);padding:12px 16px;display:flex;align-items:center;gap:11px;flex-shrink:0}
-.backBtn{width:34px;height:34px;border-radius:var(--rs);background:var(--s2);border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;color:var(--txt2);transition:all .15s;flex-shrink:0}
-.backBtn:hover{border-color:var(--blue);color:var(--cyan)}
-.pageHdr h2{font-family:var(--fD);font-size:22px;font-weight:800;flex:1}
-.routeBody{padding:13px 15px;display:flex;flex-direction:column;gap:11px;flex:1}
-.dispAlert{background:var(--blue-dim);border:1px solid rgba(77,171,247,.25);border-radius:var(--rs);padding:11px 13px;display:flex;align-items:center;gap:10px;animation:slideDown .25s ease}
-.daIco{width:34px;height:34px;border-radius:var(--rs);background:rgba(77,171,247,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.daTxt h4{font-size:13px;font-weight:600;color:var(--cyan)}
-.daTxt p{font-family:var(--fM);font-size:10px;color:var(--txt3);margin-top:1px}
-.rCard{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:13px}
-.rPts{display:flex;flex-direction:column}
-.rPt{display:flex;align-items:flex-start;gap:9px;padding:3px 0}
-.rSpine{display:flex;flex-direction:column;align-items:center;flex-shrink:0;margin-top:4px}
-.rNode{width:9px;height:9px;border-radius:50%}
-.rNode.f{background:var(--green);box-shadow:0 0 9px var(--green)}
-.rNode.t{background:var(--red);box-shadow:0 0 9px var(--red)}
-.rLine{width:2px;flex:1;min-height:24px;background:repeating-linear-gradient(to bottom,var(--bd2) 0 4px,transparent 4px 8px);margin:3px 0}
-.rInfo h4{font-family:var(--fD);font-size:17px;font-weight:700}
-.rInfo p{font-size:11px;color:var(--txt3)}
-.intList{display:flex;flex-direction:column;gap:6px}
-.intItem{display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--s2);border-radius:var(--rs);border:1px solid var(--bd);transition:all .3s}
-.intItem.cleared{border-color:rgba(38,222,129,.25);background:var(--green-dim)}
-.intN{font-family:var(--fM);font-size:9px;color:var(--txt3);width:28px;flex-shrink:0}
-.intDot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:all .3s}
-.intDot.p{background:var(--txt3)}
-.intDot.c{background:var(--green);box-shadow:0 0 8px var(--green)}
-.intNm{flex:1;font-size:13px;font-weight:500}
-.intD{font-family:var(--fM);font-size:10px;color:var(--txt3)}
-.intSt{font-family:var(--fM);font-size:9px;padding:3px 7px;border-radius:4px;flex-shrink:0}
-.intSt.p{background:var(--s3);color:var(--txt3)}
-.intSt.c{background:var(--green-dim);color:var(--green)}
-.etaRow{background:var(--s2);border:1px solid var(--bd2);border-radius:var(--rs);padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
-.etaLbl{font-family:var(--fM);font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:1px}
-.etaVal{font-family:var(--fD);font-size:30px;font-weight:900;color:var(--green);line-height:1}
-.etaVs{font-size:10px;color:var(--txt3);font-family:var(--fM)}
-.btn2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto}
-.btnSec{padding:12px;border-radius:var(--rs);border:1.5px solid var(--bd2);background:var(--s2);color:var(--txt2);font-family:var(--fD);font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;transition:all .15s}
-.btnSec:hover{border-color:var(--blue);color:var(--cyan)}
-.btnGo{width:100%;padding:16px;border-radius:var(--rs);background:var(--green);color:#07090d;font-family:var(--fD);font-size:19px;font-weight:900;letter-spacing:2px;text-transform:uppercase;box-shadow:0 4px 22px var(--green-glow);transition:all .18s;border:none}
-.btnGo:hover{transform:translateY(-1px);box-shadow:0 8px 32px var(--green-glow)}
-.destSel{background:var(--s2);border:1.5px solid var(--bd2);border-radius:var(--rs);padding:12px 14px;color:var(--txt);font-size:15px;width:100%;appearance:none;cursor:pointer;margin-bottom:10px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23445566' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center}
-.destSel option{background:var(--s2)}
-
-/* ══════════════════════════════
-   NAV SCREEN
-══════════════════════════════ */
-#sNav{padding-bottom:0}
-.navTopbar{background:var(--s1);border-bottom:1px solid var(--bd);padding:9px 13px;display:flex;align-items:center;justify-content:space-between;position:relative;flex-shrink:0}
-.nStat{display:flex;flex-direction:column}
-.nStat .nsl{font-family:var(--fM);font-size:8px;color:var(--txt3);letter-spacing:1px;text-transform:uppercase}
-.nStat .nsv{font-family:var(--fD);font-size:23px;font-weight:900;line-height:1.1}
-.nCenter{position:absolute;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;max-width:38vw}
-.nCenter .ncl{font-family:var(--fM);font-size:8px;color:var(--txt3);letter-spacing:1px;text-transform:uppercase}
-.nCenter .ncv{font-family:var(--fD);font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.spdBox .sdv{font-family:var(--fD);font-size:40px;font-weight:900;line-height:1;text-align:right;transition:color .3s}
-.spdBox .sdu{font-family:var(--fM);font-size:9px;color:var(--txt3);text-align:right}
-.spdBox .sdv.hot{color:var(--red);animation:hbeat 1s ease-in-out infinite}
-
-/* Route progress */
-.routeProg{padding:7px 13px;background:var(--s1);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:9px;flex-shrink:0}
-.rpBar{flex:1;height:5px;border-radius:3px;background:var(--s3);overflow:hidden}
-.rpFill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--cyan));transition:width 1s ease;box-shadow:0 0 8px var(--green-glow)}
-.rpLabel{font-family:var(--fM);font-size:9px;color:var(--txt3);flex-shrink:0}
-
-/* Intersection banner */
-.intBanner{padding:11px 15px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid;transition:all .35s;flex-shrink:0;position:relative;overflow:hidden}
-.intBanner.clearing{background:linear-gradient(135deg,rgba(240,62,62,.16) 0%,rgba(240,62,62,.04) 100%);border-color:var(--red);color:var(--red)}
-.intBanner.clear{background:linear-gradient(135deg,rgba(38,222,129,.16) 0%,rgba(38,222,129,.04) 100%);border-color:var(--green);color:var(--green)}
-.intBanner.approaching{background:var(--s1);border-color:var(--bd2);color:var(--txt2)}
-.ibLeft .ibs{font-family:var(--fD);font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:currentColor}
-.ibLeft .ibn{font-size:15px;font-weight:700;color:var(--txt);margin-top:2px}
-.ibRight{text-align:right;flex-shrink:0}
-.distBig{font-family:var(--fD);font-size:46px;font-weight:900;line-height:1;color:currentColor}
-.distUnit{font-family:var(--fM);font-size:11px;opacity:.65}
-.distEta{font-family:var(--fM);font-size:10px;color:var(--txt3);margin-top:1px}
-
-/* Nav map */
-.navMapWrap{flex:1;position:relative;min-height:280px}
-#navLeaflet{width:100%;height:100%;min-height:280px}
-.turnHUD{position:absolute;bottom:10px;left:10px;right:10px;z-index:500;background:rgba(7,9,13,.92);backdrop-filter:blur(10px);border:1px solid var(--bd2);border-radius:var(--rs);padding:11px 14px;display:flex;align-items:center;gap:11px;pointer-events:none;box-shadow:0 8px 30px rgba(0,0,0,.5)}
-.turnArrowBox{width:42px;height:42px;border-radius:9px;background:var(--blue-dim);border:1px solid rgba(77,171,247,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:24px}
-.turnTxt .tt{font-family:var(--fD);font-size:16px;font-weight:800}
-.turnTxt .ts{font-size:11px;color:var(--txt3);font-family:var(--fM);margin-top:2px}
-.navSOS{position:absolute;top:10px;right:10px;z-index:600;background:var(--red);color:white;border:none;border-radius:var(--rs);font-family:var(--fD);font-size:14px;font-weight:900;letter-spacing:2px;padding:8px 13px;cursor:pointer;box-shadow:0 0 16px var(--red-glow);transition:all .15s}
-.navSOS:hover{box-shadow:0 0 24px var(--red-glow);transform:scale(1.03)}
-.navMute{position:absolute;top:10px;left:10px;z-index:600;background:rgba(7,9,13,.85);backdrop-filter:blur(4px);border:1.5px solid var(--bd2);color:var(--txt2);border-radius:var(--rs);padding:8px 10px;cursor:pointer;transition:all .15s}
-.navMute:hover{border-color:var(--blue);color:var(--cyan)}
-.navMute.muted{opacity:.4}
-.navRcntr{position:absolute;bottom:80px;right:10px;z-index:600;background:rgba(7,9,13,.85);backdrop-filter:blur(4px);border:1.5px solid var(--bd2);color:var(--txt2);border-radius:var(--rs);padding:8px 10px;cursor:pointer;transition:all .15s;font-size:14px}
-.navRcntr:hover{border-color:var(--blue);color:var(--cyan)}
-
-/* Priority */
-.prioBar{display:flex;gap:7px;padding:9px 13px;background:var(--s1);border-top:1px solid var(--bd);flex-shrink:0}
-.pBtn{flex:1;padding:11px 5px;border-radius:var(--rs);border:2px solid transparent;font-family:var(--fD);font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;transition:all .18s;background:var(--s2)}
-.pBtn.pc{color:var(--red);border-color:var(--red-dim)}
-.pBtn.pu{color:var(--yellow);border-color:var(--yellow-dim)}
-.pBtn.pr{color:var(--green);border-color:var(--green-dim)}
-.pBtn.on.pc{background:var(--red-dim);border-color:var(--red);box-shadow:0 0 14px var(--red-glow)}
-.pBtn.on.pu{background:var(--yellow-dim);border-color:var(--yellow);box-shadow:0 0 14px rgba(255,212,59,.25)}
-.pBtn.on.pr{background:var(--green-dim);border-color:var(--green);box-shadow:0 0 14px var(--green-glow)}
-.navActions{display:flex;gap:8px;padding:8px 13px;background:var(--s1);border-top:1px solid var(--bd);flex-shrink:0;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
-.btnArrive{flex:1;padding:13px;border-radius:var(--rs);background:var(--green);color:#07090d;font-family:var(--fD);font-size:17px;font-weight:900;letter-spacing:1px;text-transform:uppercase;box-shadow:0 3px 16px var(--green-glow);transition:all .15s;border:none}
-.btnArrive:hover{transform:translateY(-1px)}
-
-/* ══════════════════════════════
-   COMPLETE SCREEN
-══════════════════════════════ */
-#sComplete{align-items:center;justify-content:flex-start;padding:18px;padding-bottom:calc(78px + env(safe-area-inset-bottom,0px));overflow-y:auto;padding-top:32px}
-.compWrap{width:100%;max-width:380px;margin:auto}
-.compIcoWrap{position:relative;width:76px;height:76px;margin:0 auto 18px}
-.compIco{width:76px;height:76px;border-radius:50%;background:var(--green-dim);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 0 30px var(--green-glow)}
-.compIcoRing{position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(38,222,129,.2);animation:ripple 2s ease-out infinite}
-.compTitle{font-family:var(--fD);font-size:27px;font-weight:900;text-align:center}
-.compSub{text-align:center;color:var(--txt3);font-size:11px;margin-top:4px;margin-bottom:22px;font-family:var(--fM)}
-.stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:11px}
-.s3c{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:11px;text-align:center}
-.s3c .s3v{font-family:var(--fD);font-size:24px;font-weight:900;line-height:1}
-.s3c .s3l{font-family:var(--fM);font-size:8px;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
-.savedBox{background:linear-gradient(135deg,var(--green-dim),rgba(38,222,129,.03));border:1px solid rgba(38,222,129,.25);border-radius:var(--rs);padding:16px;text-align:center;margin-bottom:15px}
-.savedBox .sv{font-family:var(--fD);font-size:36px;font-weight:900;color:var(--green);line-height:1}
-.savedBox .sl{font-size:11px;color:var(--txt3);margin-top:3px;font-family:var(--fM)}
-.compBtns{display:flex;flex-direction:column;gap:7px}
-.cBtn{width:100%;padding:13px;border-radius:var(--rs);border:1.5px solid var(--bd2);background:var(--s1);color:var(--txt);font-family:var(--fD);font-size:16px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;transition:all .15s}
-.cBtn:hover{border-color:var(--blue);color:var(--cyan)}
-.cBtn.prim{background:var(--s2);border-color:var(--blue);color:var(--cyan)}
-.cBtn.danger{color:var(--red);border-color:var(--red-dim)}
-
-/* ══════════════════════════════
-   SETTINGS SCREEN
-══════════════════════════════ */
-#sSettings{padding-bottom:60px}
-.setHdr{background:var(--s1);border-bottom:1px solid var(--bd);padding:13px 16px;flex-shrink:0}
-.setHdr h2{font-family:var(--fD);font-size:22px;font-weight:800}
-.setHdr p{font-family:var(--fM);font-size:9px;color:var(--txt3);letter-spacing:.5px;margin-top:2px}
-.setBody{padding:12px 15px;display:flex;flex-direction:column;gap:5px}
-.secTtl{font-family:var(--fM);font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:2px;padding:10px 3px 6px}
-.profCard{display:flex;align-items:center;gap:12px;background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:14px;margin-bottom:4px}
-.avatar{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-family:var(--fD);font-size:21px;font-weight:900;color:var(--bg);flex-shrink:0;box-shadow:0 0 14px var(--blue-glow)}
-.profCard h3{font-size:16px;font-weight:600}
-.profCard .pId{font-family:var(--fM);font-size:10px;color:var(--cyan);margin-top:2px}
-.profCard .pHosp{font-size:11px;color:var(--txt3);margin-top:1px}
-.sItem{display:flex;align-items:center;justify-content:space-between;background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;transition:all .15s;cursor:pointer}
-.sItem:hover{border-color:var(--bd2);background:var(--s2)}
-.sItem-L{display:flex;align-items:center;gap:10px}
-.sIco{width:32px;height:32px;border-radius:8px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-.sNm{font-size:14px;font-weight:500}
-.sSub{font-size:10px;color:var(--txt3);font-family:var(--fM);margin-top:1px}
-.sItem-R{font-family:var(--fM);font-size:10px;color:var(--txt3)}
-.sItem-R.hi{color:var(--cyan)}
-.btnLogout{width:100%;padding:13px;border-radius:var(--rs);border:1.5px solid rgba(240,62,62,.3);background:var(--red-dim);color:var(--red);font-family:var(--fD);font-size:16px;font-weight:900;letter-spacing:1px;text-transform:uppercase;margin-top:8px;transition:all .18s}
-.btnLogout:hover{border-color:var(--red);box-shadow:0 0 16px var(--red-glow)}
-
-/* ══════════════════════════════
-   SOS MODAL
-══════════════════════════════ */
-.modalOverlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
-.modalOverlay.show{display:flex;animation:fadeIn .2s ease}
-.modalBox{background:var(--s1);border:2px solid var(--red);border-radius:var(--r);padding:24px;width:100%;max-width:340px;text-align:center;box-shadow:0 0 40px var(--red-glow)}
-.mIco{font-size:40px;margin-bottom:10px}
-.mTitle{font-family:var(--fD);font-size:24px;font-weight:900;color:var(--red);letter-spacing:2px;margin-bottom:6px}
-.mSub{font-size:13px;color:var(--txt3);margin-bottom:16px;line-height:1.5}
-.mCount{font-family:var(--fD);font-size:52px;font-weight:900;color:var(--red);margin:8px 0}
-.mBtns{display:flex;gap:8px}
-.mCancel{flex:1;padding:12px;border-radius:var(--rs);border:1.5px solid var(--bd2);background:var(--s2);color:var(--txt2);font-family:var(--fD);font-size:15px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;transition:all .15s}
-.mConfirm{flex:1;padding:12px;border-radius:var(--rs);background:var(--red);color:white;font-family:var(--fD);font-size:15px;font-weight:900;letter-spacing:1px;text-transform:uppercase;box-shadow:0 4px 16px var(--red-glow);border:none;transition:all .15s}
-
-/* ══ TOAST ══ */
-#toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--s2);border:1px solid var(--bd2);border-radius:var(--rs);padding:10px 18px;font-family:var(--fM);font-size:12px;color:var(--txt);z-index:9999;opacity:0;pointer-events:none;transition:all .22s cubic-bezier(.22,1,.36,1);white-space:nowrap;max-width:90vw;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-/* ══ MAPS ══ */
-.gm-style-cc { display: none; }
-a[href^="https://maps.google.com/maps"] { display: none !important; }
-.gmnoprint a, .gmnoprint span { display: none; }
-.gmnoprint div { background: none !important; }
-/* Custom ambulance marker */
-.ambMarker{width:22px;height:22px;border-radius:50%;background:var(--green);border:3px solid white;box-shadow:0 0 18px rgba(38,222,129,.9);position:relative}
-.ambMarker::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(38,222,129,.4);animation:ripple 2s ease-out infinite}
-/* Accuracy circle pulse */
-.accCircle{border-radius:50%;background:rgba(77,171,247,.08);border:1.5px solid rgba(77,171,247,.22)}
-
-/* ══ EMERGA AGENT ══ */
-.emerga-agent{position:absolute;bottom:85px;right:15px;width:70px;height:80px;background:#141b2d;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9000;box-shadow:0 4px 15px rgba(0,0,0,0.5);cursor:pointer;transition:transform .2s;border:1px solid rgba(255,255,255,0.05)}
-.emerga-agent:active{transform:scale(0.95)}
-.emerga-icon{width:34px;height:34px;background:linear-gradient(135deg,#ff1744,#d50000);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;box-shadow:0 0 10px rgba(255,23,68,0.4)}
-.emerga-icon svg{width:20px;height:20px;fill:none;stroke:white;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.emerga-text{font-size:10px;font-family:var(--fD);font-weight:900;letter-spacing:1px;color:#fff}
-.emerga-agent.listening .emerga-icon{animation:emergaFlicker 1.5s infinite alternate}
-@keyframes emergaFlicker{
-  0%{box-shadow:0 0 5px #ff1744,0 0 10px #ff1744;transform:scale(1)}
-  100%{box-shadow:0 0 20px #ff1744,0 0 35px #ff1744;transform:scale(1.05)}
-}
-</style>
+  <!-- NavPath Styles -->
+  <link rel="stylesheet" href="/static/css/ambulance.css">
 </head>
 <body>
+
+<!-- ══════════════════════════════════════
+     GLOBAL OVERLAYS
+══════════════════════════════════════ -->
 
 <div id="toast"></div>
 
@@ -458,7 +31,6 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
       <div class="fpClose" onclick="closeForgot()">✕</div>
     </div>
 
-    <!-- Step 1: Enter Driver ID -->
     <div class="fpStep on" id="fpStep1">
       <div class="fpIco">🪪</div>
       <div class="fpDesc">ENTER YOUR DRIVER ID TO FIND YOUR ACCOUNT</div>
@@ -470,27 +42,30 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
       <button class="btnAuth" style="background:var(--blue);box-shadow:0 4px 18px var(--blue-glow)" onclick="fpFindUser()">FIND ACCOUNT →</button>
     </div>
 
-    <!-- Step 2: Set New Password -->
     <div class="fpStep" id="fpStep2">
       <div class="fpUserInfo">
         <div class="fuIco">👤</div>
         <div>
           <div class="fuName" id="fpUserName">–</div>
-          <div class="fuId" id="fpUserId">–</div>
+          <div class="fuId"   id="fpUserId">–</div>
         </div>
       </div>
       <div class="fGrp">
         <div class="fLbl">New Password <span class="req">*</span></div>
         <div class="pwWrap">
           <input class="fIn" id="fpPw1" type="password" placeholder="Min 6 characters">
-          <button class="pwEye" onclick="togglePw('fpPw1',this)" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="pwEye" onclick="togglePw('fpPw1',this)" tabindex="-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
         </div>
       </div>
       <div class="fGrp">
         <div class="fLbl">Confirm New Password <span class="req">*</span></div>
         <div class="pwWrap">
           <input class="fIn" id="fpPw2" type="password" placeholder="Re-enter password">
-          <button class="pwEye" onclick="togglePw('fpPw2',this)" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="pwEye" onclick="togglePw('fpPw2',this)" tabindex="-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
         </div>
       </div>
       <div class="aErr" id="fpErr2"></div>
@@ -498,7 +73,6 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
       <div class="forgotLink" onclick="fpGoStep(1)" style="color:var(--txt3)">← Use different account</div>
     </div>
 
-    <!-- Step 3: Success -->
     <div class="fpStep" id="fpStep3">
       <div class="fpIco">✅</div>
       <div style="text-align:center">
@@ -510,7 +84,7 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
   </div>
 </div>
 
-<!-- SOS Modal -->
+<!-- SOS Confirmation Modal -->
 <div class="modalOverlay" id="sosModal">
   <div class="modalBox">
     <div class="mIco">🚨</div>
@@ -518,13 +92,16 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
     <div class="mSub">Emergency distress signal will be sent to dispatch and all nearby units.</div>
     <div class="mCount" id="sosCnt">3</div>
     <div class="mBtns">
-      <button class="mCancel" onclick="cancelSOS()">CANCEL</button>
+      <button class="mCancel"  onclick="cancelSOS()">CANCEL</button>
       <button class="mConfirm" onclick="confirmSOS()">SEND NOW</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════ SCREEN: AUTH ══════════ -->
+
+<!-- ══════════════════════════════════════
+     SCREEN: AUTH
+══════════════════════════════════════ -->
 <div class="screen active" id="sLogin">
   <div class="aShell">
     <div class="aLogo">
@@ -534,11 +111,11 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
     </div>
     <div class="aCard">
       <div class="aTabs">
-        <div class="aTab on" id="aTabLogin" onclick="switchTab('login')">Login</div>
-        <div class="aTab" id="aTabSignup" onclick="switchTab('signup')">Sign Up</div>
+        <div class="aTab on" id="aTabLogin"  onclick="switchTab('login')">Login</div>
+        <div class="aTab"    id="aTabSignup" onclick="switchTab('signup')">Sign Up</div>
       </div>
 
-      <!-- LOGIN -->
+      <!-- Login form -->
       <div class="aForm on" id="fLogin">
         <div class="fGrp">
           <div class="fLbl">Driver ID <span class="req">*</span></div>
@@ -553,13 +130,13 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
             </button>
           </div>
         </div>
-        <div class="aErr" id="lErr"></div>
-        <div class="aInfo" id="lInfo"></div>
+        <div class="aErr"  id="lErr"></div>
+        <div class="aInfo" id="lInfo" style="display:none"></div>
         <button class="btnAuth" onclick="doLogin()">LOGIN</button>
         <div class="forgotLink" onclick="openForgot()">Forgot password?</div>
       </div>
 
-      <!-- SIGNUP -->
+      <!-- Signup form -->
       <div class="aForm" id="fSignup">
         <div class="fRow">
           <div class="fGrp"><div class="fLbl">First Name <span class="req">*</span></div><input class="fIn" id="sFn" type="text" placeholder="Rajesh"></div>
@@ -608,11 +185,14 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
   </div>
 </div>
 
-<!-- ══════════ SCREEN: HOME ══════════ -->
+
+<!-- ══════════════════════════════════════
+     SCREEN: HOME
+══════════════════════════════════════ -->
 <div class="screen" id="sHome">
   <div class="hTopbar">
     <div class="driverInfo">
-      <div class="dAmb" id="hAmb">DL-AMB-0047 · AIIMS</div>
+      <div class="dAmb"  id="hAmb">DL-AMB-0047 · AIIMS</div>
       <div class="dName" id="hName">Rajesh Kumar</div>
     </div>
     <div class="hClock">
@@ -624,17 +204,17 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
       <div class="connPill live" id="connPill"><div class="cDot"></div><span id="connLabel">LIVE</span></div>
     </div>
   </div>
+
   <div class="scr">
     <div class="hBody">
 
-      <!-- MAP — real GPS location -->
+      <!-- Live map -->
       <div class="mapWidget">
         <div id="homeLeaflet"></div>
         <div class="mapLoading" id="mapLoading">
           <div class="mapSpin"></div>
           <div class="mapLoadTxt" id="mapLoadTxt">ACQUIRING GPS SIGNAL...</div>
         </div>
-        <!-- GPS denied overlay -->
         <div class="gpsDenied" id="gpsDenied">
           <div style="font-size:30px">📡</div>
           <h4>Location Required</h4>
@@ -643,12 +223,10 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
           <div class="gdSim" onclick="useSim()">Use simulation mode instead</div>
         </div>
         <div class="mapHUD">
-          <!-- GPS accuracy badge -->
           <div class="hudBadge">
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
             GPS <span class="hv" id="gpsAcc">–</span>
           </div>
-          <!-- Real address from reverse geocoding -->
           <div class="addrChip" id="addrChip">
             <div class="gpsDot searching" id="gpsDot"></div>
             <span class="addrTxt" id="addrTxt">Searching for location…</span>
@@ -659,7 +237,7 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
         </div>
       </div>
 
-      <!-- Stats: speedometer + cards -->
+      <!-- Speedometer + stat cards -->
       <div class="statsRow">
         <div class="speedCard">
           <svg class="spSvg" viewBox="0 0 110 66">
@@ -669,8 +247,8 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
             <text class="spUnit" x="55" y="68">KM/H</text>
           </svg>
         </div>
-        <div class="scard"><div class="sv" id="homeTripsVal" style="color:var(--green)">0</div><div class="sl">Trips</div></div>
-        <div class="scard"><div class="sv" id="homeSavedVal" style="color:var(--yellow)">0m</div><div class="sl">Saved</div></div>
+        <div class="scard"><div class="sv" id="homeTripsVal"   style="color:var(--green)">0</div><div class="sl">Trips</div></div>
+        <div class="scard"><div class="sv" id="homeSavedVal"   style="color:var(--yellow)">0m</div><div class="sl">Saved</div></div>
         <div class="scard"><div class="sv" id="homeClearedVal" style="color:var(--orange)">0</div><div class="sl">Cleared</div></div>
       </div>
 
@@ -701,7 +279,7 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
         </div>
       </div>
 
-      <!-- Duty -->
+      <!-- Duty toggle -->
       <div class="dutyRow">
         <div class="dutyInfo">
           <div class="dt" id="dutyLbl">On Duty</div>
@@ -710,7 +288,7 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
         <div class="tog on" id="dutyTog" onclick="toggleDuty()"><div class="togK"></div></div>
       </div>
 
-      <!-- Trip History -->
+      <!-- Trip history -->
       <div class="tripCard">
         <div class="tripHdr" onclick="toggleTrips()">
           <div class="sectionLbl" style="margin:0">📍 Trip History</div>
@@ -730,21 +308,25 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
 
       <!-- Quick actions -->
       <div class="qaGrid">
-        <button class="qaBtn" onclick="toast('📞 Calling AIIMS Dispatch...')">📞 Dispatch</button>
-        <button class="qaBtn" onclick="toast('🔔 No new alerts')">🔔 Alerts</button>
+        <button class="qaBtn"     onclick="toast('📞 Calling AIIMS Dispatch...')">📞 Dispatch</button>
+        <button class="qaBtn"     onclick="toast('🔔 No new alerts')">🔔 Alerts</button>
         <button class="qaBtn red" onclick="doSOS()">🚨 SOS</button>
       </div>
 
-      <!-- Emergency btn -->
+      <!-- Emergency button -->
       <div class="emerWrap">
         <div class="emerGlow"></div>
         <button class="emerBtn" onclick="startEmergency()">⚡ START EMERGENCY</button>
       </div>
+
     </div>
   </div>
 </div>
 
-<!-- ══════════ SCREEN: ROUTE ══════════ -->
+
+<!-- ══════════════════════════════════════
+     SCREEN: ROUTE
+══════════════════════════════════════ -->
 <div class="screen" id="sRoute">
   <div class="pageHdr">
     <button class="backBtn" onclick="goTo('sHome')">
@@ -754,10 +336,12 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
   </div>
   <div class="scr">
     <div class="routeBody">
+
       <div class="dispAlert">
         <div class="daIco"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2A19.79 19.79 0 013.07 9.81 2 2 0 012 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/></svg></div>
         <div class="daTxt"><h4>Route Assigned by Dispatch</h4><p>AIIMS Central · <span id="dispTime">–</span></p></div>
       </div>
+
       <div class="rCard">
         <div class="sectionLbl">Route</div>
         <div class="rPts">
@@ -765,21 +349,33 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
           <div class="rPt"><div class="rSpine"><div class="rNode t"></div></div><div class="rInfo"><h4 id="rTo">Safdarjung Hospital</h4></div></div>
         </div>
       </div>
+
       <div class="rCard">
         <div class="sectionLbl" id="intListLbl">Intersections to Clear</div>
         <div class="intList" id="routeIntList">
           <div style="padding:12px;font-family:var(--fM);font-size:10px;color:var(--txt3);text-align:center">Select a NavPath Route above to see intersections</div>
         </div>
       </div>
+
       <div class="etaRow">
-        <div><div class="etaLbl">Est. Arrival (NavPath)</div><div class="etaVal" id="etaMin">–</div><div class="etaVs" id="etaVs">vs – without NavPath</div></div>
-        <div style="text-align:right"><div style="font-family:var(--fM);font-size:9px;color:var(--txt3)">TIME SAVED</div><div style="font-family:var(--fD);font-size:18px;font-weight:900;color:var(--yellow)" id="etaSaved">⚡ –</div><div style="font-size:10px;color:var(--txt3);font-family:var(--fM)" id="etaDist"></div></div>
+        <div>
+          <div class="etaLbl">Est. Arrival (NavPath)</div>
+          <div class="etaVal" id="etaMin">–</div>
+          <div class="etaVs" id="etaVs">vs – without NavPath</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--fM);font-size:9px;color:var(--txt3)">TIME SAVED</div>
+          <div style="font-family:var(--fD);font-size:18px;font-weight:900;color:var(--yellow)" id="etaSaved">⚡ –</div>
+          <div style="font-size:10px;color:var(--txt3);font-family:var(--fM)" id="etaDist"></div>
+        </div>
       </div>
+
       <div class="btn2">
         <button class="btnSec" onclick="toast('📞 Calling AIIMS Dispatch...')">📞 Call Dispatch</button>
         <button class="btnSec" onclick="document.getElementById('manSec').style.display='flex'">✏️ Change Route</button>
       </div>
-      <button class="btnGo" onclick="acceptRoute()">✓  ACCEPT ROUTE & NAVIGATE</button>
+      <button class="btnGo" onclick="acceptRoute()">✓  ACCEPT ROUTE &amp; NAVIGATE</button>
+
       <div id="manSec" style="display:none;flex-direction:column;gap:8px;animation:slideDown .2s ease">
         <div class="sectionLbl" style="padding-top:4px">Select Destination</div>
         <select class="destSel" id="destSel">
@@ -787,22 +383,38 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
         </select>
         <button class="btnGo" style="background:var(--blue);box-shadow:0 4px 18px var(--blue-glow)" onclick="manualRoute()">CONFIRM ROUTE</button>
       </div>
+
     </div>
   </div>
 </div>
 
-<!-- ══════════ SCREEN: ACTIVE NAV ══════════ -->
+
+<!-- ══════════════════════════════════════
+     SCREEN: ACTIVE NAVIGATION
+══════════════════════════════════════ -->
 <div class="screen" id="sNav">
   <div class="navTopbar">
     <div class="nStat"><div class="nsl">ETA</div><div class="nsv" id="navEta" style="color:var(--green)">–</div></div>
     <div class="nCenter"><div class="ncl">Destination</div><div class="ncv" id="navDest">Safdarjung Hospital</div></div>
     <div class="spdBox"><div class="sdv" id="navSpd">0</div><div class="sdu">KM/H</div></div>
   </div>
-  <div class="routeProg"><div class="rpBar"><div class="rpFill" id="rpFill" style="width:0%"></div></div><div class="rpLabel" id="rpLabel">0%</div></div>
-  <div class="intBanner clearing" id="intBanner">
-    <div class="ibLeft"><div class="ibs" id="bStatus">🔴 CLEARING</div><div class="ibn" id="bName">INT-1 · Mathura Road Junction</div></div>
-    <div class="ibRight"><div><span class="distBig" id="bDist">847</span><span class="distUnit"> m</span></div><div class="distEta" id="bEta">ETA ~51 sec</div></div>
+
+  <div class="routeProg">
+    <div class="rpBar"><div class="rpFill" id="rpFill" style="width:0%"></div></div>
+    <div class="rpLabel" id="rpLabel">0%</div>
   </div>
+
+  <div class="intBanner clearing" id="intBanner">
+    <div class="ibLeft">
+      <div class="ibs" id="bStatus">🔴 CLEARING</div>
+      <div class="ibn" id="bName">INT-1 · Mathura Road Junction</div>
+    </div>
+    <div class="ibRight">
+      <div><span class="distBig" id="bDist">847</span><span class="distUnit"> m</span></div>
+      <div class="distEta" id="bEta">ETA ~51 sec</div>
+    </div>
+  </div>
+
   <div class="navMapWrap">
     <div id="navLeaflet"></div>
     <button class="navMute" id="muteBtn" onclick="toggleMute()">
@@ -812,34 +424,41 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
     <button class="navRcntr" onclick="recenterNav()">⊕</button>
     <div class="turnHUD">
       <div class="turnArrowBox" id="turnArr">↰</div>
-      <div class="turnTxt"><div class="tt" id="turnTxt">Turn LEFT onto Ring Road</div><div class="ts" id="turnDist">in 300 m</div></div>
+      <div class="turnTxt">
+        <div class="tt" id="turnTxt">Turn LEFT onto Ring Road</div>
+        <div class="ts" id="turnDist">in 300 m</div>
+      </div>
+    </div>
+    <!-- Emerga voice agent -->
+    <div class="emerga-agent" id="emergaAgent" onclick="toggleEmerga()">
+      <div class="emerga-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="emerga-text">EMERGA</div>
     </div>
   </div>
+
   <div class="prioBar">
     <button class="pBtn pc on" id="pCrit" onclick="setPrio('critical')">🔴 Critical</button>
     <button class="pBtn pu"    id="pUrg"  onclick="setPrio('urgent')">🟡 Urgent</button>
-    <button class="pBtn pr"   id="pRout" onclick="setPrio('routine')">🟢 Routine</button>
+    <button class="pBtn pr"    id="pRout" onclick="setPrio('routine')">🟢 Routine</button>
   </div>
+
   <div class="navActions">
     <button class="btnSec" style="flex:1;padding:11px;font-size:13px;background:var(--red);color:#fff;border-color:var(--red)" onclick="abortTrip()">✕ End Trip</button>
     <button class="btnArrive" onclick="arrive()">Arrive at Destination →</button>
   </div>
-  
-  <!-- Emerga Agent Badge -->
-  <div class="emerga-agent" id="emergaAgent" onclick="toggleEmerga()">
-    <div class="emerga-icon">
-      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-    </div>
-    <div class="emerga-text">EMERGA</div>
-  </div>
 </div>
 
-<!-- ══════════ SCREEN: COMPLETE ══════════ -->
+
+<!-- ══════════════════════════════════════
+     SCREEN: TRIP COMPLETE
+══════════════════════════════════════ -->
 <div class="screen" id="sComplete">
   <div class="compWrap">
     <div class="compIcoWrap"><div class="compIco">✓</div><div class="compIcoRing"></div></div>
     <div class="compTitle" id="compTitle">Patient Pickup Reached</div>
-    <div class="compSub" id="compSub">HOSPITAL · –</div>
+    <div class="compSub"   id="compSub">HOSPITAL · –</div>
     <div class="stats3">
       <div class="s3c"><div class="s3v" id="compTripTime">–</div><div class="s3l">Trip Time</div></div>
       <div class="s3c"><div class="s3v" id="compCleared" style="color:var(--green)">–</div><div class="s3l">Cleared</div></div>
@@ -850,14 +469,17 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
       <div class="sl">⚡ NavPath saved this much time vs normal traffic</div>
     </div>
     <div class="compBtns">
-      <button class="cBtn prim" onclick="startReturnTrip()">↩ Start Return Trip</button>
-      <button class="cBtn" onclick="finishTrip()">✓ Done — Save Trip</button>
+      <button class="cBtn prim"   onclick="startReturnTrip()">↩ Start Return Trip</button>
+      <button class="cBtn"        onclick="finishTrip()">✓ Done — Save Trip</button>
       <button class="cBtn danger" onclick="toast('⚠ Incident report logged')">⚠ Report Incident</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════ SCREEN: SETTINGS ══════════ -->
+
+<!-- ══════════════════════════════════════
+     SCREEN: SETTINGS
+══════════════════════════════════════ -->
 <div class="screen" id="sSettings">
   <div class="setHdr"><h2>Settings</h2><p id="setAmb">DL-AMB-0047 · NavPath v4.0</p></div>
   <div class="scr">
@@ -869,7 +491,7 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
       <div class="secTtl">Audio</div>
       <div class="sItem"><div class="sItem-L"><div class="sIco">🔊</div><div><div class="sNm">Alert Volume</div><div class="sSub">Voice guidance</div></div></div><div class="sItem-R hi">HIGH</div></div>
       <div class="sItem" onclick="this.querySelector('.tog').classList.toggle('on')"><div class="sItem-L"><div class="sIco">🗣</div><div><div class="sNm">Voice Guidance</div><div class="sSub">Intersection announcements</div></div></div><div class="tog on"><div class="togK"></div></div></div>
-      <div class="secTtl">Map & Display</div>
+      <div class="secTtl">Map &amp; Display</div>
       <div class="sItem"><div class="sItem-L"><div class="sIco">🗺</div><div><div class="sNm">Map Style</div><div class="sSub">Google Maps Styling</div></div></div><div class="sItem-R" id="themeLbl">DARK</div></div>
       <div class="sItem" onclick="toggleTheme(this)"><div class="sItem-L"><div class="sIco">🌙</div><div><div class="sNm">Night Mode</div></div></div><div class="tog on"><div class="togK"></div></div></div>
       <div class="secTtl">Location</div>
@@ -880,13 +502,14 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
       <div class="sItem" onclick="toast('📞 +91-11-26588500')"><div class="sItem-L"><div class="sIco">📞</div><div><div class="sNm">Dispatch Hotline</div><div class="sSub">+91-11-26588500</div></div></div><div class="sItem-R hi">Edit</div></div>
       <div class="secTtl">System</div>
       <div class="sItem"><div class="sItem-L"><div class="sIco">ℹ</div><div><div class="sNm">About NavPath</div><div class="sSub">v4.0 · Server: Online</div></div></div></div>
-      <button id="logout-btn" class="btnLogout">↩ Logout</button>
+      <button id="logout-btn" class="btnLogout" onclick="doLogout()">↩ Logout</button>
     </div>
   </div>
 </div>
 
-<!-- ══ NAV BAR ══ -->
-<nav id="navBar" style="display:none">
+
+<!-- ══ BOTTOM NAV BAR ══ -->
+<nav id="navBar" style="display:none;align-items:stretch">
   <button class="nb" id="nbH" onclick="goTo('sHome')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home
   </button>
@@ -905,2167 +528,48 @@ a[href^="https://maps.google.com/maps"] { display: none !important; }
   </button>
 </nav>
 
+
+<!-- ══════════════════════════════════════
+     EXTERNAL LIBRARIES
+══════════════════════════════════════ -->
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA2QoXXiv_CNdPDnO4ezJ1yWNURDxmwqA8&libraries=geometry,places,marker"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- ══════════════════════════════════════
+     NAVPATH MODULES  (load order matters)
+══════════════════════════════════════ -->
+<script src="/static/js/ambulance/app.js"></script>
+<script src="/static/js/ambulance/ui.js"></script>
+<script src="/static/js/ambulance/auth.js"></script>
+<script src="/static/js/ambulance/gps.js"></script>
+<script src="/static/js/ambulance/maps.js"></script>
+<script src="/static/js/ambulance/nav.js"></script>
+<script src="/static/js/ambulance/route.js"></script>
+<script src="/static/js/ambulance/socket.js"></script>
+<script src="/static/js/ambulance/emerga.js"></script>
+
+<!-- ══════════════════════════════════════
+     BOOTSTRAP  (runs once on DOM ready)
+══════════════════════════════════════ -->
 <script>
-/* ═══════════════════════════════════════
-   MAP STYLE
-═══════════════════════════════════════ */
-const MAP_STYLE_DARK = [
-  { elementType: "geometry", stylers: [{ color: "#0e1318" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0e1318" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#8899aa" }] },
-  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#4dabf7" }] },
-  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#445566" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#141a22" }] },
-  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#28344a" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#1e2736" }] },
-  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#28344a" }] },
-  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#8899aa" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2e3f55" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1e2736" }] },
-  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#edf2f7" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#1b2333" }] },
-  { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#4dabf7" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#07090d" }] },
-  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#28344a" }] },
-  { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#07090d" }] }
-];
-
-const MAP_STYLE_LIGHT = [];
-
-/* ═══════════════════════════════════════
-   APP STATE
-═══════════════════════════════════════ */
-/* ── SERVER CONFIG ── */
-// Auto-detect server URL: use the page origin when served from Render/GitHub Pages,
-// fall back to localhost:5000 for local development
-const SERVER_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:5000'
-  : window.location.origin;
-
-const APP = {
-  user: null,
-  gps: null,          // { lat, lng, accuracy, speed, heading }
-  gpsMode: 'none',    // 'real' | 'sim' | 'none'
-  watcher: null,
-  muted: false,
-  duty: true,
-  shiftStart: new Date(),
-  priority: 'critical',
-  bannerIdx: 0,
-  navEtaSec: 574,
-  navTimer: null,
-  navProgress: 0,
-  navTotalDist: 0,     // total route distance in meters
-  homeMap: null,
-  navMap: null,
-  homeMarker: null,
-  homeAccCircle: null,
-  navMarker: null,
-  navRoute: null,          // array of LatLng objects from Directions API
-  navDestName: null,       // chosen hospital name
-  navDestCoord: null,      // chosen hospital LatLng
-  dirRenderer: null,       // DirectionsRenderer on navMap
-  sosTimer: null,
-  sosCount: 3,
-  addressCache: {},
-  lastGeocodeCoord: null,
-  toastTimer: null,
-  nearbyResults: [],       // raw Places API results
-  // ── Server integration ──
-  ambId: 'AMB-2026',       // matched to server FLEET; overridden from user.amb
-  routeId: '',             // active server route e.g. 'ROUTE-1'
-  serverRoutes: [],        // routes list from server init event
-  serverStats: {},         // stats from server
-  gpsInterval: null,       // GPS POST loop handle
-};
-
-/* ═══════════════════════════════════════
-   USER DB (localStorage)
-═══════════════════════════════════════ */
-const DB = {
-  get(){ try{ return JSON.parse(localStorage.getItem('np_v4')||'[]'); }catch(e){ return []; } },
-  save(u){ localStorage.setItem('np_v4', JSON.stringify(u)); },
-  find(id,pw){ return this.get().find(u=>u.id.toUpperCase()===id.toUpperCase()&&u.pw===pw); },
-  has(id){ return !!this.get().find(u=>u.id.toUpperCase()===id.toUpperCase()); },
-  add(u){ const all=this.get(); all.push(u); this.save(all); }
-};
-if(!DB.has('DRV-2047')) DB.add({id:'DRV-2047',pw:'demo1234',fn:'Rajesh',ln:'Kumar',amb:'DL-AMB-0047',hosp:'AIIMS Trauma Centre'});
-
-/* ═══════════════════════════════════════
-   SCREEN ROUTER
-═══════════════════════════════════════ */
-const NB = {sHome:'nbH',sRoute:'nbR',sNav:'nbN',sComplete:'nbC',sSettings:'nbS'};
-function goTo(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
-  if(NB[id]) document.getElementById(NB[id]).classList.add('active');
-  document.getElementById('navBar').style.display = id==='sLogin'?'none':'flex';
-  if(id==='sHome'){
-    initHomeMap();
-    fetchBattery();
-    if(APP.gps){
-      const fromEl = document.getElementById('rFrom');
-      if(fromEl) fromEl.textContent = document.getElementById('addrTxt')?.textContent || 'Current Location';
-    }
-    stopGpsLoop();
-  }
-  if(id==='sNav'){
-    APP.tripStart = new Date();
-    initNavMap();
-    startNavTimer();
-    startGpsLoop();
-  }
-  if(id==='sRoute'){
-    document.getElementById('dispTime').textContent = now12();
-    const fromEl = document.getElementById('rFrom');
-    if(fromEl && APP.gps) fromEl.textContent = document.getElementById('addrTxt')?.textContent || 'Current Location';
-    populateServerRoutes();
-    if(APP.gps) fetchNearbyHospitals(APP.gps.lat, APP.gps.lng);
-    else if(APP.gpsMode === 'sim') fetchNearbyHospitals(28.5672, 77.2100);
-  }
-  if(id==='sComplete'){
-    stopGpsLoop();
-    const destName = APP.navDestName || 'Hospital';
-    document.getElementById('compSub').textContent = destName.toUpperCase() + ' · ' + now12();
-    document.getElementById('compTitle').textContent = '🏥 Arrived at ' + destName;
-
-    // ── Trip Time (real elapsed) ──
-    let tripSec = 0;
-    if(APP.tripStart){
-      tripSec = Math.round((new Date() - APP.tripStart) / 1000);
-      const m = Math.floor(tripSec/60), s = tripSec % 60;
-      const timeEl = document.getElementById('compTripTime');
-      if(timeEl) timeEl.textContent = m + 'm ' + (s<10?'0':'') + s + 's';
-    }
-
-    // ── Intersections Cleared (route step count) ──
-    const clrEl = document.getElementById('compCleared');
-    if(clrEl){
-      // Prefer server-tracked cleared count, fall back to step count
-      const srvCleared = APP.serverStats?.intersections_cleared;
-      const stepCleared = APP._navSteps ? Math.max(0, APP._navSteps.length - 2) : 0;
-      clrEl.textContent = (typeof srvCleared === 'number' && srvCleared > 0) ? srvCleared : stepCleared;
-    }
-
-    // ── Distance (from real OSRM route distance) ──
-    const distEl = document.getElementById('compDist');
-    if(distEl){
-      if(APP.navTotalDist && APP.navTotalDist > 0){
-        distEl.textContent = (APP.navTotalDist / 1000).toFixed(1);
-      } else if(APP.navTotalSec > 0){
-        // rough fallback: avg 40 km/h for the route
-        distEl.textContent = ((APP.navTotalSec / 3600) * 40).toFixed(1);
-      } else {
-        distEl.textContent = '–';
-      }
-    }
-
-    // ── Time Saved vs normal traffic ──
-    const savedEl = document.getElementById('compSaved');
-    if(savedEl){
-      const rawSavedSec = Math.max(0, Math.min((APP.navTotalSec || 0) - tripSec, 7200));
-      const sm = Math.floor(rawSavedSec / 60), ss = rawSavedSec % 60;
-      savedEl.textContent = rawSavedSec > 0
-        ? '+' + sm + 'm ' + (ss < 10 ? '0' : '') + ss + 's'
-        : 'Great drive!';
-    }
-
-    rateStar(0);
-  }
-}
-
-// ── Guard: block trip start when off duty ──
-function startEmergency(){
-  if(!APP.duty){
-    toast('🔴 Switch to On Duty before starting a trip!');
-    if(navigator.vibrate) navigator.vibrate([80,40,80]);
-    // Briefly flash the duty toggle to draw attention
-    const tog = document.getElementById('dutyTog');
-    if(tog){ tog.style.boxShadow='0 0 18px var(--red-glow)'; setTimeout(()=>tog.style.boxShadow='',1200); }
-    return;
-  }
-  goTo('sRoute');
-}
-
-function clearNavState() {
-  APP.routeId = '';
-  APP.navRoute = null;
-  APP.navDestName = null;
-  APP.navDestCoord = null;
-  APP._pendingDirectionsResult = null;
-  APP._navSteps = null;
-  APP.navProgress = 0;
-  APP.navTotalDist = 0;
-  // Reset nav UI elements
-  const rpFill = document.getElementById('rpFill');
-  if(rpFill) rpFill.style.width = '0%';
-  const rpLabel = document.getElementById('rpLabel');
-  if(rpLabel) rpLabel.textContent = '0%';
-  const bDist = document.getElementById('bDist');
-  if(bDist) bDist.textContent = '–';
-  const bEta = document.getElementById('bEta');
-  if(bEta) bEta.textContent = '';
-  const bStatus = document.getElementById('bStatus');
-  if(bStatus) bStatus.textContent = '⬤  APPROACHING';
-  const bName = document.getElementById('bName');
-  if(bName) bName.textContent = 'Calculating route…';
-  const banner = document.getElementById('intBanner');
-  if(banner) {
-      banner.className = 'intBanner approaching';
-      delete banner.dataset.serverControlled;
-  }
-  if(APP.navPolyline) APP.navPolyline.setLatLngs([]);
-  if(APP.navMap && APP._routeMarkers) {
-    APP._routeMarkers.forEach(m => APP.navMap.removeLayer(m));
-  }
-  APP._routeMarkers = [];
-  const srvSel = document.getElementById('srvRouteSel');
-  if(srvSel) srvSel.value = '';
-  const rList = document.getElementById('routeIntList');
-  if(rList) rList.innerHTML = '<div style="padding:12px;font-family:var(--fM);font-size:10px;color:var(--txt3);text-align:center">Select a NavPath Route above to see intersections</div>';
-  const ndot = document.getElementById('navDot');
-  if(ndot) ndot.classList.remove('show');
-}
-
-function saveTripToHistory() {
-  if(!APP.user) return;
-  APP.user.trips = APP.user.trips || [];
-  let durStr = "0m";
-  let tripSec = 0;
-  if(APP.tripStart){
-    tripSec = Math.round((new Date() - APP.tripStart)/1000);
-    const m = Math.floor(tripSec/60), s = tripSec%60;
-    durStr = m + 'm ' + s + 's';
-  }
-  const totalInts = APP._navSteps ? Math.max(0, APP._navSteps.length - 2) : 0;
-  // Calculate time saved: original ETA − actual trip time (capped at 2 hours)
-  const rawSavedSec = (APP.navTotalSec || 0) - tripSec;
-  const savedSec    = Math.max(0, Math.min(rawSavedSec, 7200)); // cap at 2 h
-  const savedMin    = Math.floor(savedSec / 60);
-  const savedS      = savedSec % 60;
-  const timeSavedStr = savedMin > 0 ? ('+' + savedMin + 'm ' + savedS + 's') : (savedSec > 0 ? ('+' + savedS + 's') : '0s');
-  const dateStr = 'Today ' + now12();
-  const sf = document.getElementById('rFrom');
-  const st = document.getElementById('rTo');
-  const rtName = (sf?.textContent?.split(',')[0] || 'Unknown') + ' → ' + (st?.textContent || APP.navDestName || 'Destination');
-  
-  APP.user.trips.push({
-    dateStr: dateStr,
-    routeName: rtName,
-    durationStr: durStr,
-    clearCount: totalInts,
-    timeSavedSec: savedSec,     // ← reliable numeric field
-    timeSavedStr: timeSavedStr  // ← human-readable display
-  });
-  const all = DB.get();
-  const idx = all.findIndex(u => u.id === APP.user.id);
-  if(idx >= 0) { all[idx] = APP.user; DB.save(all); }
-  renderTrips(APP.user);
-  updateHomeTripStats(APP.user);
-  APP.tripStart = null;
-}
-
-function finishTrip() {
-  saveTripToHistory();
-  clearNavState();
-  goTo('sHome');
-  toast('✅ Trip saved to history');
-}
-
-function startReturnTrip() {
-  saveTripToHistory();
-  clearNavState();
-  goTo('sRoute');
-}
-
-function renderTrips(u){
-  const tb = document.getElementById('tripBody');
-  const chev = document.getElementById('tripChev');
-  if(!tb || !chev) return;
-  const countLbl = chev.previousElementSibling;
-  
-  if(!u.trips || !u.trips.length){
-    tb.innerHTML = '<div style="padding:15px;text-align:center;color:var(--txt3);font-size:12px">No trips yet</div>';
-    if(countLbl) countLbl.textContent = '0 trips';
-    return;
-  }
-  
-  const sorted = u.trips.slice().reverse();
-  if(countLbl) countLbl.textContent = sorted.length + ' trips';
-  
-  tb.innerHTML = '';
-  sorted.forEach(t => {
-    const savedHtml = t.timeSavedStr ? `<div class="tripSave">${t.timeSavedStr}</div>` : '';
-    tb.innerHTML += `
-      <div class="tripItem">
-        <div class="tripBadge">🚑</div>
-        <div class="tripI">
-          <div class="tr">${t.routeName}</div>
-          <div class="td">${t.dateStr} · ${t.durationStr} · ${t.clearCount} junctions</div>
-        </div>
-        ${savedHtml}
-      </div>
-    `;
-  });
-}
-
-function updateHomeTripStats(u) {
-  if(!u || !u.trips) return;
-  const trips = u.trips;
-  // Total trips
-  const tripsEl = document.getElementById('homeTripsVal');
-  if(tripsEl) tripsEl.textContent = trips.length;
-  // Total cleared
-  const cleared = trips.reduce((sum, t) => sum + (parseInt(t.clearCount) || 0), 0);
-  const clearedEl = document.getElementById('homeClearedEl') || document.getElementById('homeClearedVal');
-  if(clearedEl) clearedEl.textContent = cleared;
-  // Total time saved — prefer numeric timeSavedSec, fall back to string parsing with a 2-hour sanity cap
-  const MAX_PER_TRIP = 7200; // 2 hours in seconds — blocks corrupt old data
-  let totalSavedSec = 0;
-  trips.forEach(t => {
-    if(typeof t.timeSavedSec === 'number' && isFinite(t.timeSavedSec)) {
-      // Reliable numeric path (new trips)
-      totalSavedSec += Math.min(Math.max(0, t.timeSavedSec), MAX_PER_TRIP);
-    } else if(t.timeSavedStr) {
-      // Legacy string path — extract minutes & seconds with sanity bounds
-      const mMatch = t.timeSavedStr.match(/(\d{1,4})m/);  // max 4-digit minutes = 1666h, safely bounded below
-      const sMatch = t.timeSavedStr.match(/(\d{1,2})s/);  // max 2-digit seconds
-      const mins   = mMatch ? parseInt(mMatch[1]) : 0;
-      const secs   = sMatch ? parseInt(sMatch[1]) : 0;
-      const parsed = mins * 60 + secs;
-      if(parsed <= MAX_PER_TRIP) totalSavedSec += parsed; // skip corrupt entries
-    }
-  });
-  const totalMin = Math.floor(totalSavedSec / 60);
-  const totalSec = totalSavedSec % 60;
-  const savedSel = document.getElementById('homeSavedVal');
-  if(savedSel) savedSel.textContent = totalMin > 0 ? totalMin + 'm' : totalSavedSec + 's';
-}
-
-function abortTrip(){
-  if(!confirm('Are you sure you want to end this trip?')) return;
-  clearInterval(APP.navTimer);
-  APP.navTimer = null;
-  stopGpsLoop();
-  if(APP.routeId){
-    fetch(SERVER_URL+'/api/end_trip',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({amb_id:APP.ambId})
-    })
-    .then(()=>{ APP.routeId=''; })
-    .catch(e=>console.warn('end_trip failed',e));
-  }
-  // Save a partial trip entry
-  if(APP.tripStart && APP.user) {
-    saveTripToHistory();
-  } else {
-    APP.tripStart = null;
-  }
-  clearNavState();
-  goTo('sHome');
-  toast('Trip ended');
-}
-
-/* ═══════════════════════════════════════
-   TOAST
-═══════════════════════════════════════ */
-let _tt;
-function toast(msg){
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.classList.add('show');
-  clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2800);
-}
-
-/* ═══════════════════════════════════════
-   AUTH
-═══════════════════════════════════════ */
-function switchTab(t){
-  document.getElementById('aTabLogin').classList.toggle('on',t==='login');
-  document.getElementById('aTabSignup').classList.toggle('on',t==='signup');
-  document.getElementById('fLogin').classList.toggle('on',t==='login');
-  document.getElementById('fSignup').classList.toggle('on',t==='signup');
-}
-function togglePw(id,btn){
-  const f=document.getElementById(id);
-  f.type = f.type==='text'?'password':'text';
-  btn.style.color = f.type==='text'?'var(--cyan)':'var(--txt3)';
-}
-function showErr(el,msg){ el.style.display='block'; el.textContent=msg; }
-function hideErr(el){ el.style.display='none'; }
-
-/* ═══════════════════════════════════════
-   FORGOT PASSWORD
-═══════════════════════════════════════ */
-let _fpUser = null;
-function openForgot(){
-  _fpUser = null;
-  document.getElementById('fpId').value = '';
-  document.getElementById('fpPw1').value = '';
-  document.getElementById('fpPw2').value = '';
-  document.getElementById('fpErr1').style.display='none';
-  document.getElementById('fpErr2').style.display='none';
-  fpGoStep(1);
-  document.getElementById('fpModal').classList.add('show');
-}
-function closeForgot(){
-  document.getElementById('fpModal').classList.remove('show');
-  _fpUser = null;
-}
-function fpGoStep(n){
-  [1,2,3].forEach(i=>{
-    const el=document.getElementById('fpStep'+i);
-    if(el) el.className='fpStep'+(i===n?' on':'');
-  });
-}
-function fpFindUser(){
-  const id=document.getElementById('fpId').value.trim().toUpperCase();
-  const err=document.getElementById('fpErr1');
-  err.style.display='none';
-  if(!id){ showErr(err,'Please enter your Driver ID.'); return; }
-  const all=DB.get();
-  const u=all.find(u=>u.id.toUpperCase()===id);
-  if(!u){ showErr(err,'No account found with that Driver ID.'); return; }
-  _fpUser=u;
-  document.getElementById('fpUserName').textContent=u.fn+' '+u.ln;
-  document.getElementById('fpUserId').textContent='ID: '+u.id+' · '+u.hosp;
-  fpGoStep(2);
-}
-function fpResetPw(){
-  const pw1=document.getElementById('fpPw1').value;
-  const pw2=document.getElementById('fpPw2').value;
-  const err=document.getElementById('fpErr2');
-  err.style.display='none';
-  if(!pw1||!pw2){ showErr(err,'Please fill in both password fields.'); return; }
-  if(pw1.length<6){ showErr(err,'Password must be at least 6 characters.'); return; }
-  if(pw1!==pw2){ showErr(err,'Passwords do not match.'); return; }
-  if(!_fpUser){ fpGoStep(1); return; }
-  // Update password in localStorage
-  const all=DB.get();
-  const idx=all.findIndex(u=>u.id.toUpperCase()===_fpUser.id.toUpperCase());
-  if(idx>=0){ all[idx].pw=pw1; DB.save(all); }
-  fpGoStep(3);
-}
-
-function doLogin(){
-  const id=document.getElementById('lId').value.trim();
-  const pw=document.getElementById('lPw').value;
-  const err=document.getElementById('lErr');
-  hideErr(err);
-  if(!id||!pw){ showErr(err,'Enter Driver ID and password.'); return; }
-  const u=DB.find(id,pw);
-  if(!u){ showErr(err,'Invalid Driver ID or password.'); return; }
-  APP.user=u; applyUser(u);
-  goTo('sHome');
-  startGPS();
-}
-function doSignup(){
-  const fn=document.getElementById('sFn').value.trim();
-  const ln=document.getElementById('sLn').value.trim();
-  const id=document.getElementById('sId').value.trim().toUpperCase();
-  const amb=document.getElementById('sAmb').value.trim().toUpperCase();
-  const hosp=document.getElementById('sHosp').value;
-  const pw=document.getElementById('sPw').value;
-  const pw2=document.getElementById('sPw2').value;
-  const err=document.getElementById('sErr');
-  hideErr(err);
-  if(!fn||!ln||!id||!amb||!hosp||!pw||!pw2){ showErr(err,'All fields are required.'); return; }
-  if(pw.length<6){ showErr(err,'Password must be at least 6 characters.'); return; }
-  if(pw!==pw2){ showErr(err,'Passwords do not match.'); return; }
-  if(DB.has(id)){ showErr(err,'Driver ID already registered.'); return; }
-  const u={id,pw,fn,ln,amb,hosp};
-  DB.add(u); APP.user=u; applyUser(u);
-  goTo('sHome');
-  startGPS();
-  toast('✅ Welcome, '+fn+'! Account created.');
-}
-function doLogout(){
-  stopGpsLoop();
-  if(APP.watcher!=null){ navigator.geolocation.clearWatch(APP.watcher); APP.watcher=null; }
-  clearInterval(APP.navTimer);
-  if(APP.routeId) {
-    fetch(SERVER_URL+'/api/end_trip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amb_id:APP.ambId})}).catch(()=>{});
-  }
-  APP.user=null; APP.gps=null; APP.homeMap=null; APP.navMap=null;
-  APP.navDestName=null; APP.navDestCoord=null; APP.nearbyResults=[];
-  APP.routeId=''; APP.serverRoutes=[];
-  placesService = null;
-  goTo('sLogin');
-  toast('Logged out');
-}
-function applyUser(u){
-  const full=u.fn+' '+u.ln;
-  const init=(u.fn[0]||'')+(u.ln[0]||'');
-  document.getElementById('hName').textContent=full;
-  document.getElementById('hAmb').textContent=u.amb+' · '+u.hosp;
-  document.getElementById('setName').textContent=full;
-  document.getElementById('setId').textContent='ID: '+u.id;
-  document.getElementById('setHosp').textContent=u.hosp;
-  document.getElementById('setAmb').textContent=u.amb+' · NavPath v4.0';
-  document.getElementById('setAvatar').textContent=init.toUpperCase();
-  APP.shiftStart=new Date();
-  APP.ambId = u.amb || 'AMB-2026';
-  u.trips = u.trips || [];
-  // Sanitise corrupt legacy trips: drop any trip whose timeSavedStr encodes
-  // an obviously impossible value (> 2 hours AND no valid timeSavedSec field)
-  u.trips = u.trips.filter(t => {
-    if(typeof t.timeSavedSec === 'number' && isFinite(t.timeSavedSec)) return true;
-    if(!t.timeSavedStr) return true;
-    const mMatch = t.timeSavedStr.match(/(\d+)m/);
-    if(mMatch && parseInt(mMatch[1]) > 9999) return false; // > ~166 hours → corrupt
-    return true;
-  });
-  // Also back-fill timeSavedSec for legacy clean trips that only have a string
-  u.trips.forEach(t => {
-    if(typeof t.timeSavedSec !== 'number' && t.timeSavedStr) {
-      const mM = t.timeSavedStr.match(/(\d{1,4})m/);
-      const sM = t.timeSavedStr.match(/(\d{1,2})s/);
-      t.timeSavedSec = (mM ? parseInt(mM[1]) * 60 : 0) + (sM ? parseInt(sM[1]) : 0);
-    }
-  });
-  // Persist sanitised data
-  const all = DB.get();
-  const idx = all.findIndex(x => x.id === u.id);
-  if(idx >= 0) { all[idx] = u; DB.save(all); }
-  renderTrips(u);
-  updateHomeTripStats(u);
-}
-
-/* ═══════════════════════════════════════
-   GPS — PRECISE LOCATION
-   Key fixes vs previous version:
-   1. enableHighAccuracy: true (forces GPS chip)
-   2. maximumAge: 0 (never use cached position)
-   3. timeout: 20000 (give it time)
-   4. Reverse geocode with Nominatim for real address
-   5. Accuracy circle on map
-   6. Update marker smoothly on every position
-═══════════════════════════════════════ */
-function startGPS(){
-  if(!navigator.geolocation){
-    toast('GPS not supported on this device');
-    useSim(); return;
-  }
-  document.getElementById('mapLoading').style.display='flex';
-  document.getElementById('mapLoadTxt').textContent='ACQUIRING GPS SIGNAL...';
-  setGPSDot('searching');
-
-  APP.watcher = navigator.geolocation.watchPosition(
-    onGPSSuccess,
-    onGPSError,
-    {
-      enableHighAccuracy: true,   // ← forces device GPS (not Wi-Fi/cell)
-      maximumAge: 0,              // ← never use cached/stale location
-      timeout: 20000              // ← wait up to 20s for real fix
-    }
-  );
-}
-
-function onGPSSuccess(pos){
-  const { latitude:lat, longitude:lng, accuracy, speed, heading } = pos.coords;
-  APP.gps = { lat, lng, accuracy: Math.round(accuracy), speed, heading };
-  APP.gpsMode = 'real';
-
-  // Hide loading overlay
-  document.getElementById('mapLoading').style.display='none';
-  document.getElementById('gpsDenied').style.display='none';
-
-  // GPS dot → green (real fix)
-  setGPSDot('real');
-
-  // Accuracy badge
-  document.getElementById('gpsAcc').textContent = '±'+Math.round(accuracy)+'m';
-  document.getElementById('gpsSetSub').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
-
-  // Speed
-  const kmh = speed!=null ? Math.round(speed*3.6) : 0;
-  updateSpeed(kmh);
-
-  // Reverse geocode for real address (throttled — only if moved >20m)
-  reverseGeocode(lat, lng);
-  
-  // Fetch dynamic hospitals (runs once)
-  fetchNearbyHospitals(lat, lng);
-
-  // Update map markers
-  updateMapMarkers(lat, lng, accuracy);
-}
-
-function onGPSError(err){
-  document.getElementById('mapLoading').style.display='none';
-  setGPSDot('sim');
-
-  if(err.code === err.PERMISSION_DENIED){
-    document.getElementById('gpsDenied').style.display='flex';
-    document.getElementById('addrTxt').textContent = 'Location denied';
-    toast('📍 Location permission denied');
-  } else if(err.code === err.TIMEOUT){
-    toast('📍 GPS timeout — retrying…');
-    // retry once silently
-    setTimeout(retryGPS, 2000);
-  } else {
-    useSim();
-    toast('📍 GPS unavailable — simulation mode');
-  }
-}
-
-function retryGPS(){
-  document.getElementById('gpsDenied').style.display='none';
-  document.getElementById('mapLoading').style.display='flex';
-  document.getElementById('mapLoadTxt').textContent='RETRYING GPS...';
-  setGPSDot('searching');
-  if(APP.watcher!=null){ navigator.geolocation.clearWatch(APP.watcher); APP.watcher=null; }
-  setTimeout(startGPS, 300);
-}
-
-function useSim(){
-  // Fallback: AIIMS New Delhi
-  document.getElementById('mapLoading').style.display='none';
-  document.getElementById('gpsDenied').style.display='none';
-  APP.gps = { lat:28.5672, lng:77.2100, accuracy:15 };
-  APP.gpsMode = 'sim';
-  setGPSDot('sim');
-  document.getElementById('gpsAcc').textContent='SIM';
-  document.getElementById('addrTxt').textContent='AIIMS, New Delhi (Simulation)';
-  updateMapMarkers(28.5672, 77.2100, 15);
-  toast('📍 Simulation mode — using AIIMS, Delhi');
-}
-
-function setGPSDot(mode){
-  const d = document.getElementById('gpsDot');
-  d.className = 'gpsDot '+mode;
-}
-
-/* ═══════════════════════════════════════
-   REVERSE GEOCODING — Google Maps
-═══════════════════════════════════════ */
-let geocoder = null;
-let geocodeTimer = null;
-function reverseGeocode(lat, lng){
-  if(!geocoder && window.google) geocoder = new google.maps.Geocoder();
-  // Only geocode if moved significantly (saves requests)
-  if(APP.lastGeocodeCoord && window.google){
-    const p1 = new google.maps.LatLng(lat, lng);
-    const p2 = new google.maps.LatLng(APP.lastGeocodeCoord.lat, APP.lastGeocodeCoord.lng);
-    const d = google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
-    if(d < 30) return; // less than 30m — skip
-  }
-  APP.lastGeocodeCoord = {lat, lng};
-
-  // Check cache
-  const key = lat.toFixed(3)+','+lng.toFixed(3);
-  if(APP.addressCache[key]){
-    setAddress(APP.addressCache[key]);
-    return;
-  }
-
-  setAddress('Fetching address…');
-
-  clearTimeout(geocodeTimer);
-  geocodeTimer = setTimeout(()=>{
-    if(geocoder){
-      geocoder.geocode({ location: {lat, lng} }, (results, status) => {
-        if(status === 'OK' && results[0]){
-          // Strip out zip codes and country for brief display
-          let parts = results[0].formatted_address.split(',');
-          let addr = parts.slice(0, 3).join(',').replace(/\d{6}/g,'').trim();
-          if(addr.endsWith(',')) addr = addr.slice(0, -1);
-          APP.addressCache[key] = addr;
-          setAddress(addr);
-        } else {
-          // Google Geocoder failed — try Nominatim as free fallback
-          nominatimGeocode(lat, lng, key);
-        }
-      });
-    } else {
-      // No Google Geocoder — use Nominatim directly
-      nominatimGeocode(lat, lng, key);
-    }
-  }, 600);
-}
-
-function setAddress(addr){
-  document.getElementById('addrTxt').textContent = addr;
-  // Live-update the route FROM label if Route screen is visible
-  const fromEl = document.getElementById('rFrom');
-  if(fromEl && document.getElementById('sRoute')?.classList.contains('active')){
-    fromEl.textContent = addr;
-  }
-}
-
-/* Nominatim free reverse geocoding (OpenStreetMap) — no billing required */
-function nominatimGeocode(lat, lng, key){
-  fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`, {
-    headers: { 'Accept-Language': 'en', 'User-Agent': 'NavPath/4.0' }
-  })
-  .then(r => r.json())
-  .then(data => {
-    const a = data.address || {};
-    const parts = [
-      a.amenity || a.university || a.road || a.neighbourhood || a.suburb,
-      a.city || a.town || a.village || a.county,
-      a.state
-    ].filter(Boolean);
-    const addr = parts.slice(0, 3).join(', ') || (lat.toFixed(4) + ', ' + lng.toFixed(4));
-    APP.addressCache[key] = addr;
-    setAddress(addr);
-  })
-  .catch(() => setAddress(lat.toFixed(4) + ', ' + lng.toFixed(4)));
-}
-
-/* ═══════════════════════════════════════
-   HOME MAP
-═══════════════════════════════════════ */
-function initHomeMap(){
-  if(APP.homeMap) return;
-  const lat = APP.gps?.lat ?? 28.5672;
-  const lng = APP.gps?.lng ?? 77.2100;
-  
-  const map = new google.maps.Map(document.getElementById('homeLeaflet'), {
-    center: {lat, lng},
-    zoom: 16,
-    styles: MAP_STYLE_DARK,
-    disableDefaultUI: true,
-    zoomControl: true,
-    mapId: "HOME_MAP_ID", // Required for AdvancedMarkerElement
-    gestureHandling: "greedy" // Better mobile experience
-  });
-
-  // Accuracy circle
-  APP.homeAccCircle = new google.maps.Circle({
-    map,
-    center: {lat, lng},
-    radius: APP.gps?.accuracy ?? 20,
-    fillColor: "#4dabf7",
-    fillOpacity: 0.08,
-    strokeColor: "#4dabf7",
-    strokeOpacity: 0.22,
-    strokeWeight: 1.5
-  });
-
-  // Custom ambulance marker
-  const ambDiv = document.createElement("div");
-  ambDiv.className = "ambMarker";
-  APP.homeMarker = new google.maps.marker.AdvancedMarkerElement({
-    map,
-    position: {lat, lng},
-    content: ambDiv
-  });
-  
-  APP.homeMap = map;
-  document.getElementById('mapLoading').style.display='none';
-  google.maps.event.trigger(map, 'resize');
-}
-
-function updateMapMarkers(lat, lng, accuracy){
-  if(APP.homeMap){
-    const pos = {lat, lng};
-    if(APP.homeMarker) APP.homeMarker.position = pos;
-    if(APP.homeAccCircle){
-      APP.homeAccCircle.setCenter(pos);
-      if(accuracy) APP.homeAccCircle.setRadius(accuracy);
-    }
-  } else {
-    initHomeMap();
-  }
-  if(APP.navMarker && APP.navMap){
-    if(APP.gpsMode === 'real' || !APP.navTimer) {
-      APP.navMarker.setLatLng([lat, lng]);
-      if(APP.navTimer && APP.gpsMode === 'real') {
-        APP.navMap.panTo([lat, lng]);
-      }
-    }
-  }
-}
-
-function recenterHome(){
-  if(APP.homeMap && APP.gps){
-    APP.homeMap.panTo({lat: APP.gps.lat, lng: APP.gps.lng});
-    APP.homeMap.setZoom(17);
-  }
-}
-
-/* ═══════════════════════════════════════
-   NAV MAP
-═══════════════════════════════════════ */
-function initNavMap(){
-  if(APP.navMap){
-    if(APP._pendingDirectionsResult){
-      drawDirectionsOnNavMap(APP._pendingDirectionsResult);
-      APP._pendingDirectionsResult = null;
-    }
-    setTimeout(() => APP.navMap.invalidateSize(), 150);
-    return;
-  }
-
-  const lat = APP.gps?.lat ?? 28.5672;
-  const lng = APP.gps?.lng ?? 77.2100;
-
-  const map = L.map('navLeaflet', {
-      zoomControl: false,
-      attributionControl: false
-  }).setView([lat, lng], 15);
-  
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19
-  }).addTo(map);
-
-  const ambIcon = L.divIcon({
-      className: '',
-      html: '<div class="ambMarker"></div>',
-      iconSize: [22, 22],
-      iconAnchor: [11, 11]
-  });
-  APP.navMarker = L.marker([lat, lng], {icon: ambIcon}).addTo(map);
-
-  APP.navPolyline = L.polyline([], {color: '#f03e3e', weight: 6, opacity: 0.9}).addTo(map);
-
-  APP.navMap = map;
-  setTimeout(() => APP.navMap.invalidateSize(), 150);
-
-  if(APP._pendingDirectionsResult){
-    drawDirectionsOnNavMap(APP._pendingDirectionsResult);
-    APP._pendingDirectionsResult = null;
-  } else if(APP.navDestCoord){
-    requestAndDrawRoute();
-  } else {
-    toast('\u26a0 Select a hospital on the Route screen first');
-  }
-}
-
-function requestAndDrawRoute(){
-  if(!APP.gps || !APP.navDestCoord) return;
-  const url = `https://router.project-osrm.org/route/v1/driving/${APP.gps.lng},${APP.gps.lat};${APP.navDestCoord.lng},${APP.navDestCoord.lat}?overview=full&geometries=geojson&steps=true`;
-  fetch(url).then(r=>r.json()).then(res=>{
-    if(res.code === 'Ok') drawDirectionsOnNavMap(res);
-    else toast('\u26a0 Could not calculate route: ' + res.message);
-  }).catch(e=>toast('\u26a0 Route error'));
-}
-
-function drawDirectionsOnNavMap(result){
-  if(!APP.navMap) return;
-  
-  if(APP._routeMarkers){
-    APP._routeMarkers.forEach(m => APP.navMap.removeLayer(m));
-  }
-  APP._routeMarkers = [];
-
-  const route = result.routes[0];
-  const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-  
-  if(APP.navPolyline) APP.navPolyline.setLatLngs(coords);
-
-  const leg   = route.legs[0];
-  const steps = leg.steps;
-  APP._navSteps = steps;
-
-  const path = coords.map(c => ({lat: c[0], lng: c[1]}));
-  APP.navRoute = path;
-
-  APP.navEtaSec    = route.duration;
-  APP.navTotalSec  = route.duration;
-  APP.navTotalDist = route.distance;  // store total distance for progress calc
-  
-  const m = Math.floor(route.duration/60);
-  const durStr = m > 60 ? Math.floor(m/60)+'h '+(m%60)+'m' : m+' min';
-  document.getElementById('navEta').textContent  = durStr;
-  const etaMinEl = document.getElementById('etaMin');
-  if(etaMinEl)  etaMinEl.textContent  = durStr;
-  
-  const distStr = route.distance > 1000 ? (route.distance/1000).toFixed(1)+' km' : Math.round(route.distance)+' m';
-  const etaDistEl = document.getElementById('etaDist');
-  if(etaDistEl) etaDistEl.textContent = distStr;
-  // Initialise distance display in banner
-  const bDistEl = document.getElementById('bDist');
-  if(bDistEl) bDistEl.textContent = route.distance > 1000 ? (route.distance/1000).toFixed(1) : Math.round(route.distance);
-  const bEtaEl = document.getElementById('bEta');
-  if(bEtaEl) bEtaEl.textContent = 'ETA ~' + m + ' min';
-
-  const endLoc  = coords[coords.length - 1]; // [lat, lng]
-  
-  const destIcon = L.divIcon({
-    className: 'custom-div-icon',
-    html: `<div style="background:#f03e3e;color:white;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;padding:4px 10px;border-radius:4px;letter-spacing:1.5px;box-shadow:0 2px 14px rgba(240,62,62,.5);white-space:nowrap">${APP.navDestName || 'DEST'}</div>`,
-    iconSize: [80, 20],
-    iconAnchor: [40, 10]
-  });
-  const mDest = L.marker(endLoc, {icon: destIcon}).addTo(APP.navMap);
-  APP._routeMarkers.push(mDest);
-
-  // Store step names for banner use
-  APP._stepNames = steps.map((s, i) => s.name || ('Step ' + i));
-
-  if (APP.routeId && APP.serverRoutes) {
-      const activeRoute = APP.serverRoutes.find(r => r.id === APP.routeId);
-      if (activeRoute && activeRoute.intersections) {
-          fetch(SERVER_URL + '/api/intersections')
-              .then(r => r.json())
-              .then(data => {
-                  const srvInts = {};
-                  const pts = Array.isArray(data) ? data : (data.intersections || []);
-                  pts.forEach(p => srvInts[p.id] = p);
-                  APP._srvIntMap = srvInts; // global cache for banner
-                  activeRoute.intersections.forEach((intId, idx) => {
-                      const intData = srvInts[intId];
-                      if (!intData) return;
-                      const seqNum = idx + 1;
-                      const intLabel = intData.name || intId;
-                      const jIcon = L.divIcon({
-                          className: 'custom-div-icon',
-                          html: `<div style="background:rgba(7,9,13,.88);border:1px solid #28344a;color:#8899aa;font-size:9px;font-family:'JetBrains Mono',monospace;padding:2px 6px;border-radius:3px;letter-spacing:.5px;white-space:nowrap">Junction ${seqNum} · ${intLabel}</div>`,
-                          iconSize: [80, 16],
-                          iconAnchor: [40, 8]
-                      });
-                      const mInt = L.marker([intData.lat, intData.lon], {icon: jIcon}).addTo(APP.navMap);
-                      APP._routeMarkers.push(mInt);
-                  });
-              }).catch(e => console.warn("Failed to fetch intersections", e));
-      }
-  }
-
-  if(steps[0]) announceStep(steps[0]);
-  APP.navMap.fitBounds(coords);
-}
-
-function recenterNav(){
-  if(APP.navMap && APP.gps){
-    APP.navMap.panTo([APP.gps.lat, APP.gps.lng]);
-    APP.navMap.setZoom(16);
-  }
-}
-
-/* ═══════════════════════════════════════
-   NAV TIMER
-═══════════════════════════════════════ */
-function startNavTimer(){
-  clearInterval(APP.navTimer);
-  APP.navProgress = 0;
-  APP.navTotalSec = APP.navEtaSec || 574; // store initial total for stats
-  const totalSec  = APP.navTotalSec;
-  const totalDist = APP.navTotalDist || (totalSec * 14); // approx metres
-  let lastStepIdx = -1;
-
-  APP.navTimer = setInterval(()=>{
-    if(APP.navEtaSec > 0) APP.navEtaSec--;
-    APP.navProgress = Math.min(((totalSec - APP.navEtaSec) / totalSec) * 100, 100);
-
-    // ETA display
-    const m = Math.floor(APP.navEtaSec / 60), s = APP.navEtaSec % 60;
-    document.getElementById('navEta').textContent = m + 'm ' + (s < 10 ? '0' : '') + s + 's';
-
-    // Progress bar — shows % of distance covered
-    const pct = APP.navProgress.toFixed(1);
-    document.getElementById('rpFill').style.width  = pct + '%';
-    document.getElementById('rpLabel').textContent = Math.round(APP.navProgress) + '%';
-
-    // Distance remaining ticker (metres)
-    const distRem = Math.max(0, Math.round(totalDist * (1 - APP.navProgress / 100)));
-    const distDisp = distRem > 999 ? (distRem / 1000).toFixed(1) : distRem;
-    const distUnit = distRem > 999 ? ' km' : ' m';
-    if (!document.getElementById('intBanner')?.dataset.serverControlled) {
-      const bDistEl = document.getElementById('bDist');
-      const bEtaEl  = document.getElementById('bEta');
-      if(bDistEl) bDistEl.textContent = distDisp;
-      if(bEtaEl)  bEtaEl.textContent  = distRem > 0
-        ? 'ETA ~' + (distRem > 999 ? Math.ceil(distRem / 1000 / 0.8) + ' min' : Math.ceil(distRem / 14) + ' sec')
-        : 'Arriving…';
-      // Update distance unit in the span next to distBig
-      const distUnitEl = bDistEl?.nextElementSibling;
-      if(distUnitEl && distUnitEl.classList.contains('distUnit')) distUnitEl.textContent = distUnit;
-    }
-
-    // Update approaching banner name from real route steps (not address)
-    if(APP._navSteps && APP._navSteps.length > 1){
-      const t      = APP.navProgress / 100;
-      const stepI  = Math.min(Math.floor(t * APP._navSteps.length), APP._navSteps.length - 1);
-      const nextI  = Math.min(stepI + 1, APP._navSteps.length - 1);
-      const nxStep = APP._navSteps[nextI];
-      const bNameEl = document.getElementById('bName');
-      const bannerEl = document.getElementById('intBanner');
-      const bStatusEl = document.getElementById('bStatus');
-      if(bNameEl && nxStep && !document.getElementById('intBanner')?.dataset.serverControlled){
-        const intName = nxStep.name ? ('Turn ' + (nextI) + ' · ' + nxStep.name.split(',')[0]) : ('Turn ' + nextI);
-        bNameEl.textContent = intName;
-        if(bannerEl) bannerEl.className = 'intBanner approaching';
-        if(bStatusEl) bStatusEl.textContent = '⬤  APPROACHING';
-      }
-    }
-
-    // Move ambulance marker along real route path
-    if(APP.navRoute && APP.navRoute.length > 1 && APP.navMarker){
-      const t    = APP.navProgress / 100;
-      const segs = APP.navRoute.length - 1;
-      const si   = Math.min(Math.floor(t * segs), segs - 1);
-      const lt   = t * segs - si;
-      const a    = APP.navRoute[si], b = APP.navRoute[si + 1];
-      const newPos = [ a.lat + (b.lat - a.lat) * lt, a.lng + (b.lng - a.lng) * lt ];
-      
-      if(APP.gpsMode !== 'real') {
-         APP.navMarker.setLatLng(newPos);
-         if(APP.navMap) APP.navMap.panTo(newPos);
-      }
-
-      // Voice: announce next turn step based on progress
-      if(APP._navSteps && APP._navSteps.length){
-        const stepIdx = Math.min(Math.floor(t * APP._navSteps.length), APP._navSteps.length - 1);
-        if(stepIdx !== lastStepIdx){
-          lastStepIdx = stepIdx;
-          announceStep(APP._navSteps[stepIdx]);
-        }
-      }
-    }
-
-    // Speed
-    const spd = APP.gps?.speed != null ? Math.round(APP.gps.speed * 3.6)
-              : (APP.gpsMode === 'sim' ? 45 + Math.floor(Math.random() * 30) : 0);
-    document.getElementById('navSpd').textContent = spd;
-    document.getElementById('navSpd').classList.toggle('hot', spd > 80);
-
-    // Arrived?
-    if(APP.navEtaSec <= 0){ clearInterval(APP.navTimer); APP.navTimer = null; arrive(); }
-  }, 1000);
-}
-
-/* ═══════════════════════════════════════
-   BANNER CYCLE
-═══════════════════════════════════════ */
-const BANNERS=[
-  {cls:'clearing',  status:'🔴  CLEARING',             name:'INT-1 · Mathura Road Junction'},
-  {cls:'clear',     status:'🟢  CLEAR — Drive Through', name:'INT-1 · Mathura Road Junction'},
-  {cls:'approaching',status:'⬤  APPROACHING',          name:'INT-2 · Ring Road Crossing'},
-  {cls:'clearing',  status:'🔴  CLEARING',             name:'INT-2 · Ring Road Crossing'},
-  {cls:'clear',     status:'🟢  CLEAR — Drive Through', name:'INT-2 · Ring Road Crossing'},
-  {cls:'approaching',status:'⬤  APPROACHING',          name:'INT-3 · IIT Flyover Signal'},
-  {cls:'clearing',  status:'🔴  CLEARING',             name:'INT-3 · IIT Flyover Signal'},
-  {cls:'clear',     status:'🟢  CLEAR — Drive Through', name:'INT-3 · IIT Flyover Signal'},
-];
-function cycleBanner(){
-  APP.bannerIdx=(APP.bannerIdx+1)%BANNERS.length;
-  const b=BANNERS[APP.bannerIdx];
-  const el=document.getElementById('intBanner');
-  el.className='intBanner '+b.cls;
-  document.getElementById('bStatus').textContent=b.status;
-  document.getElementById('bName').textContent=b.name;
-  if(!APP.muted){
-    if(b.cls==='clear')      speak('Intersection is now clear. Drive through.');
-    if(b.cls==='clearing')   speak('Clearing intersection ahead. Slow down.');
-    if(b.cls==='approaching') speak('Approaching next intersection.');
-  }
-  if(navigator.vibrate){
-    if(b.cls==='clear') navigator.vibrate([80,40,80]);
-    else if(b.cls==='clearing') navigator.vibrate([200]);
-  }
-}
-
-/* ═══════════════════════════════════════
-   PRIORITY
-═══════════════════════════════════════ */
-/* Priority map: UI label → server string */
-const PRIO_MAP = {critical:'RED', urgent:'YELLOW', routine:'GREEN'};
-const PRIO_MAP_REV = {RED:'critical', YELLOW:'urgent', GREEN:'routine', NONE:'routine'};
-
-function setPrio(p){
-  APP.priority=p;
-  document.getElementById('pCrit').classList.remove('on');
-  document.getElementById('pUrg').classList.remove('on');
-  document.getElementById('pRout').classList.remove('on');
-  const m={critical:'pCrit',urgent:'pUrg',routine:'pRout'};
-  document.getElementById(m[p]).classList.add('on');
-  const msg={critical:'🔴 CRITICAL priority active',urgent:'🟡 URGENT priority active',routine:'🟢 ROUTINE priority active'};
-  toast(msg[p]);
-  if(!APP.muted) speak(p+' priority set.');
-  // Notify server
-  fetch(SERVER_URL+'/api/set_priority',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({amb_id:APP.ambId, priority:PRIO_MAP[p]||'RED'})
-  }).catch(e=>console.warn('set_priority failed',e));
-}
-
-/* ═══════════════════════════════════════
-   MUTE
-═══════════════════════════════════════ */
-function toggleMute(){
-  APP.muted=!APP.muted;
-  document.getElementById('muteBtn').classList.toggle('muted',APP.muted);
-  toast(APP.muted?'🔇 Audio muted':'🔊 Audio on');
-}
-
-/* ═══════════════════════════════════════
-   SOS
-═══════════════════════════════════════ */
-function doSOS(){
-  document.getElementById('sosModal').classList.add('show');
-  APP.sosCount=3;
-  document.getElementById('sosCnt').textContent=3;
-  APP.sosTimer=setInterval(()=>{
-    APP.sosCount--;
-    document.getElementById('sosCnt').textContent=APP.sosCount;
-    if(APP.sosCount<=0){ clearInterval(APP.sosTimer); confirmSOS(); }
-  },1000);
-}
-function cancelSOS(){
-  clearInterval(APP.sosTimer);
-  document.getElementById('sosModal').classList.remove('show');
-}
-function confirmSOS(){
-  clearInterval(APP.sosTimer);
-  document.getElementById('sosModal').classList.remove('show');
-  toast('🚨 SOS SENT — All units notified');
-  if(!APP.muted) speak('S.O.S. activated. Connecting to dispatch now.');
-  if(navigator.vibrate) navigator.vibrate([300,150,300,150,300]);
-  
-  // Forward the SOS status to the backend server dispatch
-  fetch(SERVER_URL+'/api/sos',{
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      amb_id: APP.ambId,
-      lat: APP.gps?.lat,
-      lon: APP.gps?.lng
-    })
-  }).catch(e => console.warn('SOS delivery to server failed', e));
-}
-
-/* ═══════════════════════════════════════
-   VOICE NAVIGATION
-═══════════════════════════════════════ */
-function speak(txt){
-  if(!window.speechSynthesis || APP.muted) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(txt);
-  u.rate = 0.9; u.pitch = 1.05; u.volume = 1;
-  window.speechSynthesis.speak(u);
-}
-
-function announceStep(step){
-  if(!step || APP.muted) return;
-  const dist = step.distance > 1000 ? (step.distance/1000).toFixed(1)+' km' : Math.round(step.distance)+' m';
-  const type = step.maneuver.type;
-  const mod = step.maneuver.modifier;
-  const name = step.name ? ' onto ' + step.name : '';
-  let text = `${type} ${mod || ''}${name}`.trim();
-  if (type === 'turn') text = `Turn ${mod}${name}`;
-  else if (type === 'new name') text = `Continue${name}`;
-  else if (type === 'depart') text = `Head ${mod||''}${name}`;
-  else if (type === 'arrive') text = `Arrive at destination`;
-  
-  speak('In ' + dist + ', ' + text);
-  // Update HUD
-  const turnTxt  = document.getElementById('turnTxt');
-  const turnDist = document.getElementById('turnDist');
-  const turnArr  = document.getElementById('turnArr');
-  if(turnTxt)  turnTxt.textContent  = text;
-  if(turnDist) turnDist.textContent = 'in ' + dist;
-  if(turnArr){
-    const maneuver = mod || '';
-    if(maneuver.includes('left'))  turnArr.textContent = '↰';
-    else if(maneuver.includes('right')) turnArr.textContent = '↱';
-    else if(maneuver.includes('uturn')) turnArr.textContent = '↺';
-    else turnArr.textContent = '⬆';
-  }
-}
-
-/* ═══════════════════════════════════════
-   SPEECH
-═══════════════════════════════════════ */
-function speak(txt){
-  if(!window.speechSynthesis||APP.muted) return;
-  window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(txt);
-  u.rate=.93; u.pitch=1.05;
-  window.speechSynthesis.speak(u);
-}
-
-/* ═══════════════════════════════════════
-   BATTERY
-═══════════════════════════════════════ */
-// fetchBattery defined below (full version)
-
-/* ═══════════════════════════════════════
-   SPEEDOMETER
-═══════════════════════════════════════ */
-function updateSpeed(kmh){
-  document.getElementById('statSpd').textContent=kmh;
-  document.getElementById('navSpd').textContent=kmh;
-  // Speedometer arc: max 120 km/h, arc length 163
-  const pct=Math.min(kmh/120,1);
-  const offset=163-(pct*163);
-  const fill=document.getElementById('spFill');
-  fill.style.strokeDashoffset=offset;
-  fill.style.stroke=kmh>80?'var(--red)':kmh>50?'var(--yellow)':'var(--cyan)';
-}
-
-/* ═══════════════════════════════════════
-   ROUTE ACTIONS
-═══════════════════════════════════════ */
-/* ─── Server route assignment ─── */
-function assignRouteToServer(routeId){
-  if(!routeId) return;
-  APP.routeId = routeId;
-  fetch(SERVER_URL+'/api/assign_route',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({amb_id:APP.ambId, route_id:routeId})
-  })
-  .then(r=>r.json())
-  .then(data=>{ if(data.route) toast('🗺 Route assigned: '+data.route.name); })
-  .catch(e=>console.warn('assign_route failed',e));
-}
-
-function acceptRoute(){
-  // Off-duty guard
-  if(!APP.duty){
-    toast('🔴 Switch to On Duty before starting a trip!');
-    if(navigator.vibrate) navigator.vibrate([80,40,80]);
-    return;
-  }
-  document.getElementById('navDot').classList.remove('show');
-  const srvSel = document.getElementById('srvRouteSel');
-  const routeToAssign = APP.routeId || (srvSel && srvSel.value);
-  if(routeToAssign){
-    assignRouteToServer(routeToAssign);
-  } else if(!APP.navDestName && APP.nearbyResults.length){
-    const h = APP.nearbyResults[0];
-    APP.navDestName  = h.name;
-    APP.navDestCoord = { lat: h.geometry.location.lat(), lng: h.geometry.location.lng() };
-    document.getElementById('navDest').textContent = h.name;
-    document.getElementById('rTo').textContent     = h.name;
-    previewRoute(APP.navDestCoord);
-  }
-  setTimeout(() => goTo('sNav'), 150);
-}
-function manualRoute(){
-  // Off-duty guard
-  if(!APP.duty){
-    toast('🔴 Switch to On Duty before starting a trip!');
-    if(navigator.vibrate) navigator.vibrate([80,40,80]);
-    return;
-  }
-  const sel = document.getElementById('destSel');
-  const idx = sel.value;
-  if(idx === '' || idx === null || isNaN(parseInt(idx))){ toast('Select a destination first'); return; }
-  onDestSelChange();
-  document.getElementById('navDot').classList.remove('show');
-  const srvSel = document.getElementById('srvRouteSel');
-  if(srvSel && srvSel.value) assignRouteToServer(srvSel.value);
-  setTimeout(() => goTo('sNav'), 200);
-}
-function arrive(){
-  clearInterval(APP.navTimer);
-  stopGpsLoop();
-  
-  // Tell server the trip is done
-  fetch(SERVER_URL+'/api/end_trip',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({amb_id:APP.ambId})
-  })
-  .then(()=>{ APP.routeId=''; })
-  .catch(e=>console.warn('end_trip failed',e));
-  
-  goTo('sComplete');
-}
-
-/* ═══════════════════════════════════════
-   DUTY
-═══════════════════════════════════════ */
-function toggleDuty(){
-  APP.duty=!APP.duty;
-  document.getElementById('dutyTog').classList.toggle('on',APP.duty);
-  document.getElementById('dutyLbl').textContent=APP.duty?'On Duty':'Off Duty';
-  if(APP.duty){ APP.shiftStart=new Date(); }
-  toast(APP.duty?'🟢 On Duty':'🔴 Off Duty');
-}
-
-/* ═══════════════════════════════════════
-   CLOCK + SHIFT TIMER
-═══════════════════════════════════════ */
-function tickClock(){
-  const now=new Date();
-  document.getElementById('liveClock').textContent=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-  document.getElementById('liveDate').textContent=now.toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'}).toUpperCase();
-  if(APP.shiftStart&&APP.duty){
-    const diff=Math.floor((now-APP.shiftStart)/1000);
-    const h=Math.floor(diff/3600), m=Math.floor((diff%3600)/60), s=diff%60;
-    document.getElementById('shiftElapsed').textContent=h>0?`${h}:${pad(m)}:${pad(s)}`:`${pad(m)}:${pad(s)}`;
-    document.getElementById('dutyTime').textContent='Shift started '+APP.shiftStart.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  }
-}
-setInterval(tickClock,1000); tickClock();
-
-/* ═══════════════════════════════════════
-   TRIP HISTORY TOGGLE
-═══════════════════════════════════════ */
-function toggleTrips(){
-  const b=document.getElementById('tripBody'), c=document.getElementById('tripChev');
-  b.classList.toggle('open');
-  c.style.transform=b.classList.contains('open')?'rotate(180deg)':'none';
-}
-
-/* ═══════════════════════════════════════
-   SOCKET.IO — SERVER CONNECTION
-═══════════════════════════════════════ */
-const socket = io(SERVER_URL, { transports: ['websocket','polling'], reconnectionDelay: 2000 });
-
-function setConnPill(live){
-  const p = document.getElementById('connPill');
-  const l = document.getElementById('connLabel');
-  if(!p||!l) return;
-  p.className = live ? 'connPill live' : 'connPill offline';
-  l.textContent = live ? 'LIVE' : 'OFFLINE';
-}
-
-socket.on('connect', ()=>{
-  setConnPill(true);
-  console.log('[NavPath] Socket connected:', socket.id);
-});
-
-socket.on('disconnect', ()=>{
-  setConnPill(false);
-  toast('🔴 Server disconnected');
-});
-
-/* init — bootstraps state on first connect */
-socket.on('init', data=>{
-  if(data.routes)  APP.serverRoutes = data.routes;
-  if(data.stats)   APP.serverStats  = data.stats;
-  // Update home stats cards
-  updateHomeStats(data.stats);
-  console.log('[NavPath] Server init received. Routes:', data.routes?.length, 'Intersections:', data.intersections?.length);
-});
-
-/* analytics — live GPS update processed by server */
-socket.on('analytics', data=>{
-  if(data.amb_id !== APP.ambId) return;
-  // Update ETA on nav screen
-  // (Removed: We no longer let the server overwrite the smart local ETA. Server sends high values when the vehicle stops).
-  // Update server stats
-  if(data.stats){ APP.serverStats = data.stats; updateHomeStats(data.stats); }
-  // Update intersection banner from live data
-  if(data.intersections){
-    updateBannerFromServer(data.intersections);
-    updateRouteIntListFromAnalytics(data.intersections); // live route screen updates
-  }
-});
-
-/* route_assigned — dispatcher pushed a route */
-socket.on('route_assigned', data=>{
-  if(!data.route) return;
-  APP.routeId = data.route.id;
-  toast('📡 Dispatch assigned: ' + data.route.name);
-  // Update route card labels
-  const rFrom = document.getElementById('rFrom');
-  const rTo   = document.getElementById('rTo');
-  const navDest = document.getElementById('navDest');
-  if(rFrom) rFrom.textContent = data.route.origin;
-  if(rTo)   rTo.textContent   = data.route.destination;
-  if(navDest) navDest.textContent = data.route.destination;
-  APP.navDestName = data.route.destination;
-  // Flash nav dot
-  document.getElementById('navDot')?.classList.add('show');
-});
-
-/* trip_ended */
-socket.on('trip_ended', data=>{
-  if(data.amb_id === APP.ambId){
-    toast('✅ Trip ended — server confirmed');
-    APP.routeId = '';
-  }
-});
-
-/* priority_change */
-socket.on('priority_change', data=>{
-  if(data.amb_id === APP.ambId && data.priority){
-    const uiP = PRIO_MAP_REV[data.priority] || 'critical';
-    APP.priority = uiP;
-    const m = {critical:'pCrit',urgent:'pUrg',routine:'pRout'};
-    document.querySelectorAll('.pBtn').forEach(b=>b.classList.remove('on'));
-    document.getElementById(m[uiP])?.classList.add('on');
-  }
-});
-
-/* ─── Update home screen stats from server stats ─── */
-function updateHomeStats(stats){
-  if(!stats) return;
-  // Trips cleared (intersections_cleared) — server stat takes priority over local
-  const sClear = document.getElementById('homeClearedVal');
-  if(sClear && (stats.intersections_cleared != null || stats.total_overrides != null))
-    sClear.textContent = stats.intersections_cleared ?? stats.total_overrides ?? 0;
-  // Time saved
-  const sSaved = document.getElementById('homeSavedVal');
-  if(sSaved && stats.time_saved_str) sSaved.textContent = stats.time_saved_str;
-  // Trips
-  const sTrips = document.getElementById('homeTripsVal');
-  if(sTrips && stats.total_trips != null) sTrips.textContent = stats.total_trips;
-}
-
-/* ─── Update intersection banner from server analytics payload ─── */
-function updateBannerFromServer(intersections){
-  if(!intersections || !intersections.length) return;
-  // Find the first OVERRIDE intersection
-  const over = intersections.find(i => i.state === 'OVERRIDE');
-  const target = over || intersections[0];
-  if(!target) return;
-  const banner = document.getElementById('intBanner');
-  const bStatus = document.getElementById('bStatus');
-  const bName   = document.getElementById('bName');
-  const bDist   = document.getElementById('bDist');
-  if(!banner || !bStatus || !bName) return;
-
-  const formatDist = (distVal) => {
-    if(distVal == null || !bDist) return;
-    const unitEl = bDist.nextElementSibling;
-    if (distVal > 999) {
-        bDist.textContent = (distVal / 1000).toFixed(1);
-        if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' km';
-    } else {
-        bDist.textContent = distVal;
-        if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' m';
-    }
-  };
-
-  if(over){
-    // Mark as server-controlled so the timer doesn't overwrite it
-    banner.dataset.serverControlled = '1';
-    banner.className = 'intBanner clearing';
-    bStatus.textContent = '🔴 CLEARING';
-    // Show intersection name mapping sequentially
-    const seqT = APP._routeIntIds ? (APP._routeIntIds.indexOf(target.id)+1) : 0;
-    const prefixT = seqT > 0 ? ('Junction ' + seqT) : target.id;
-    bName.textContent   = prefixT + ' · ' + (target.name || 'Junction');
-    formatDist(target.distance);
-    const bEta = document.getElementById('bEta');
-    if(bEta && target.override_duration) bEta.textContent = 'Override: ' + target.override_duration + 's';
-  } else {
-    // Keep server control active when approaching any route intersection
-    banner.dataset.serverControlled = '1';
-    const nearest = intersections.reduce((a,b)=>((a.distance||9999)<(b.distance||9999)?a:b));
-    banner.className = 'intBanner approaching';
-    bStatus.textContent = '⬤ APPROACHING';
-    // Use sequential numbering mapped from route order
-    const seqN = APP._routeIntIds ? (APP._routeIntIds.indexOf(nearest.id)+1) : 0;
-    const prefixN = seqN > 0 ? ('Junction ' + seqN) : nearest.id;
-    bName.textContent   = prefixN + ' · ' + (nearest.name || 'Junction');
-    formatDist(nearest.distance);
-  }
-}
-
-/* ─── Fallback: browser online/offline ─── */
-window.addEventListener('online', ()=>{ if(!socket.connected) setConnPill(true); });
-window.addEventListener('offline',()=>{ setConnPill(false); toast('🔴 Network lost — offline mode'); });
-
-/* ═══════════════════════════════════════
-   WAKE LOCK
-═══════════════════════════════════════ */
-async function keepOn(){
-  if('wakeLock' in navigator){ try{ await navigator.wakeLock.request('screen'); }catch(e){} }
-}
-
-/* ═══════════════════════════════════════
-   TRIP RATING
-═══════════════════════════════════════ */
-function rateStar(n){
-  const labels = ['','Poor','Average','Good','Great','Excellent!'];
-  const stars  = document.querySelectorAll('.star');
-  stars.forEach(s => {
-    const v = parseInt(s.dataset.v);
-    s.style.filter    = v <= n ? 'none' : 'grayscale(1)';
-    s.style.color     = v <= n ? '#ffd43b' : 'var(--txt3)';
-    s.style.transform = v <= n ? 'scale(1.15)' : 'scale(1)';
-  });
-  const txt = document.getElementById('ratingTxt');
-  if(txt) txt.textContent = n ? labels[n] + ' — Thank you!' : '';
-  if(n) toast('⭐ ' + labels[n] + ' trip rating submitted!');
-}
-
-/* ═══════════════════════════════════════
-   BATTERY — Real device battery API
-═══════════════════════════════════════ */
-function fetchBattery(){
-  const valEl  = document.getElementById('batVal');
-  const fillEl = document.getElementById('batFill');
-  if(!valEl || !fillEl) return;
-  if(!navigator.getBattery){
-    valEl.textContent = 'N/A';
-    return;
-  }
-  navigator.getBattery().then(b => {
-    const update = () => {
-      const pct = Math.round(b.level * 100);
-      const col = pct > 50 ? 'var(--green)' : pct > 20 ? 'var(--yellow)' : 'var(--red)';
-      valEl.textContent        = pct + '%';
-      valEl.style.color        = col;
-      fillEl.style.width       = pct + '%';
-      fillEl.style.background  = col;
-      if(pct < 20) toast('🔋 Low battery: ' + pct + '%');
-    };
-    update();
-    b.addEventListener('levelchange',   update);
-    b.addEventListener('chargingchange', update);
-  });
-}
-
-/* ═══════════════════════════════════════
-   DYNAMIC HOSPITALS (Places API)
-═══════════════════════════════════════ */
-let placesService = null;
-let _hospitalsTimer = null;
-
-function fetchNearbyHospitals(lat, lng){
-  if(!window.google || !window.google.maps.places) {
-    // Places API not loaded — use fallback immediately
-    useFallbackHospitals(lat, lng);
-    return;
-  }
-  
-  // Re-use existing service or create new one, preferring homeMap as container
-  if(!placesService){
-    const container = APP.homeMap ? APP.homeMap.getDiv() : (()=>{
-      const d = document.getElementById('_placesDiv') || document.createElement('div');
-      d.id = '_placesDiv';
-      d.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none';
-      document.body.appendChild(d);
-      return d;
-    })();
-    placesService = new google.maps.places.PlacesService(container);
-  }
-  
-  const destSel = document.getElementById('destSel');
-  if(destSel) destSel.innerHTML = '<option value="" disabled selected>Searching nearby hospitals…</option>';
-  
-  // Auto-fallback if callback doesn't fire within 4 seconds
-  clearTimeout(_hospitalsTimer);
-  _hospitalsTimer = setTimeout(() => {
-    const sel = document.getElementById('destSel');
-    if(sel && sel.options.length <= 1 && sel.options[0]?.text.includes('Searching')){
-      useFallbackHospitals(lat, lng);
-    }
-  }, 4000);
-  
-  const req = {
-    location: new google.maps.LatLng(lat, lng),
-    radius: 10000,
-    type: ['hospital']
-  };
-  
-  placesService.nearbySearch(req, (results, status) => {
-    clearTimeout(_hospitalsTimer);
-    if(status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0){
-      populateHospitals(results);
-    } else {
-      console.warn('Places API status:', status);
-      useFallbackHospitals(lat, lng);
-    }
-  });
-}
-
-function useFallbackHospitals(lat, lng){
-  // Multi-city hospital database — sorted by proximity to user GPS
-  const ALL_HOSPITALS = [
-    // Punjab / Chandigarh
-    {name:'PGIMER Chandigarh', vicinity:'Sector 12, Chandigarh', lat:30.7650, lng:76.7849},
-    {name:'Government Medical College & Hospital', vicinity:'Sector 32, Chandigarh', lat:30.7270, lng:76.7769},
-    {name:'Fortis Hospital Mohali', vicinity:'Phase 8, Mohali', lat:30.7096, lng:76.6910},
-    {name:'Max Super Speciality Hospital', vicinity:'Phase 6, Mohali', lat:30.7076, lng:76.7169},
-    {name:'Civil Hospital Rajpura', vicinity:'Rajpura, Patiala', lat:30.4846, lng:76.5936},
-    {name:'Patiala Civil Surgeon Hospital', vicinity:'Leishman Road, Patiala', lat:30.3398, lng:76.3869},
-    {name:'Ivy Hospital', vicinity:'Sector 71, Mohali', lat:30.6742, lng:76.7182},
-    {name:'Fortis Hospital Ludhiana', vicinity:'Chandigarh Road, Ludhiana', lat:30.9010, lng:75.8573},
-    {name:'DMC & Hospital Ludhiana', vicinity:'Tagore Nagar, Ludhiana', lat:30.9098, lng:75.8477},
-    // Delhi NCR
-    {name:'AIIMS New Delhi', vicinity:'Ansari Nagar, New Delhi', lat:28.5672, lng:77.2100},
-    {name:'Safdarjung Hospital', vicinity:'Sri Aurobindo Marg, New Delhi', lat:28.5678, lng:77.2030},
-    {name:'RML Hospital', vicinity:'Baba Kharak Singh Marg, New Delhi', lat:28.6321, lng:77.2100},
-    {name:'GTB Hospital', vicinity:'Dilshad Garden, Delhi', lat:28.6783, lng:77.3106},
-    {name:'Lok Nayak Hospital', vicinity:'Jawahar Lal Nehru Marg, New Delhi', lat:28.6418, lng:77.2395},
-    {name:'Max Smart Hospital Saket', vicinity:'Saket, New Delhi', lat:28.5284, lng:77.2127},
-    // Mumbai
-    {name:'KEM Hospital', vicinity:'Parel, Mumbai', lat:18.9984, lng:72.8416},
-    {name:'Lilavati Hospital', vicinity:'Bandra West, Mumbai', lat:19.0523, lng:72.8274},
-    {name:'Breach Candy Hospital', vicinity:'Breach Candy, Mumbai', lat:18.9713, lng:72.8060},
-    // Bengaluru
-    {name:'Manipal Hospital', vicinity:'Old Airport Road, Bengaluru', lat:12.9651, lng:77.6480},
-    {name:'Victoria Hospital', vicinity:'Majestic, Bengaluru', lat:12.9774, lng:77.5760},
-  ];
-  // Sort by straight-line distance to user location
-  function dist(h){ const dlat=h.lat-lat, dlng=h.lng-lng; return dlat*dlat+dlng*dlng; }
-  const sorted = ALL_HOSPITALS.slice().sort((a,b)=>dist(a)-dist(b)).slice(0,10);
-  const mockResults = sorted.map(h => ({
-    name: h.name,
-    vicinity: h.vicinity,
-    geometry: { location: { lat:()=>h.lat, lng:()=>h.lng } }
-  }));
-  populateHospitals(mockResults);
-}
-
-function populateHospitals(list){
-  const sHosp = document.getElementById('sHosp');
-  const destSel = document.getElementById('destSel');
-  
-  APP.nearbyResults = list.slice(0, 15);
-  
-  let htmlHosp = '<option value="" disabled selected>Select your fleet</option>';
-  let htmlDest = '<option value="" disabled selected>Choose destination…</option>';
-  
-  APP.nearbyResults.forEach((h, i) => {
-    const vicinity = h.vicinity ? ` — ${h.vicinity.split(',').slice(0,2).join(',')}` : '';
-    htmlHosp += `<option value="${i}">${h.name}${vicinity}</option>`;
-    htmlDest  += `<option value="${i}">${h.name}${vicinity}</option>`;
-  });
-  
-  if(sHosp) sHosp.innerHTML = htmlHosp;
-  if(destSel) { destSel.innerHTML = htmlDest; destSel.onchange = onDestSelChange; }
-}
-
-function onDestSelChange(){
-  const sel = document.getElementById('destSel');
-  const idx = parseInt(sel.value);
-  if(isNaN(idx)) return;
-  const place = APP.nearbyResults[idx];
-  if(!place) return;
-  APP.navDestName  = place.name;
-  APP.navDestCoord = {
-    lat: place.geometry.location.lat(),
-    lng: place.geometry.location.lng()
-  };
-  // Update route card labels immediately
-  document.getElementById('rTo').textContent    = place.name;
-  document.getElementById('navDest').textContent = place.name;
-  // Preview ETA via Directions API
-  previewRoute(APP.navDestCoord);
-}
-
-function previewRoute(destCoord){
-  if(!APP.gps || !destCoord) return;
-  const url = `https://router.project-osrm.org/route/v1/driving/${APP.gps.lng},${APP.gps.lat};${destCoord.lng},${destCoord.lat}?overview=full&geometries=geojson&steps=true`;
-  fetch(url).then(r=>r.json()).then(res=>{
-    if(res.code !== 'Ok') return;
-    const route = res.routes[0];
-    const m = Math.floor(route.duration / 60);
-    const durStr = m > 60 ? Math.floor(m/60)+'h '+(m%60)+'m' : m+' min';
-    const etaMinEl = document.getElementById('etaMin');
-    if(etaMinEl) etaMinEl.textContent = durStr;
-    const distStr = route.distance > 1000 ? (route.distance/1000).toFixed(1)+' km' : Math.round(route.distance)+' m';
-    const etaDistEl = document.getElementById('etaDist');
-    if(etaDistEl) etaDistEl.textContent = distStr;
-    APP._pendingDirectionsResult = res;
-  });
-}
-
-/* ═══════════════════════════════════════
-   HELPERS
-═══════════════════════════════════════ */
-function pad(n){ return n<10?'0'+n:n; }
-function now12(){ return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
-
-/* ═══════════════════════════════════════
-   GPS POST LOOP — sends live GPS to server every 1s
-═══════════════════════════════════════ */
-function startGpsLoop(){
-  stopGpsLoop();
-  APP.gpsInterval = setInterval(sendGpsUpdate, 1000);
-  console.log('[NavPath] GPS POST loop started');
-}
-function stopGpsLoop(){
-  if(APP.gpsInterval){ clearInterval(APP.gpsInterval); APP.gpsInterval=null; }
-}
-function sendGpsUpdate(){
-  if(!APP.gps) return;
-  const speed = APP.gps.speed != null ? APP.gps.speed * 3.6
-              : (APP.gpsMode==='sim' ? 45+Math.floor(Math.random()*20) : 0);
-  const body = {
-    amb_id:   APP.ambId,
-    lat:      APP.gps.lat,
-    lon:      APP.gps.lng,
-    speed:    Math.round(speed),
-    priority: PRIO_MAP[APP.priority] || 'RED',
-    route_id: APP.routeId || ''
-  };
-  fetch(SERVER_URL+'/api/gps',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(body)
-  }).catch(e=>console.warn('[NavPath] GPS POST failed',e));
-}
-
-/* ═══════════════════════════════════════
-   POPULATE SERVER ROUTES DROPDOWN
-═══════════════════════════════════════ */
-function populateServerRoutes(){
-  // Always fetch fresh routes from server each time Route screen opens
-  fetch(SERVER_URL+'/api/routes')
-    .then(r=>r.json())
-    .then(routes=>{ APP.serverRoutes=routes; buildServerRouteDropdown(); })
-    .catch(()=>{
-      // If fetch fails but we have cached routes, use them
-      buildServerRouteDropdown();
-    });
-}
-function buildServerRouteDropdown(){
-  let srvSel = document.getElementById('srvRouteSel');
-  if(!srvSel){
-    srvSel = document.createElement('select');
-    srvSel.id = 'srvRouteSel';
-    srvSel.className = 'destSel';
-    srvSel.style.marginBottom = '0';
-    const btnGo = document.querySelector('#sRoute .btnGo');
-    if(btnGo) btnGo.parentNode.insertBefore(srvSel, btnGo);
-  }
-  if(!APP.serverRoutes.length){
-    srvSel.innerHTML = '<option value="">No server routes available — is server running?</option>';
-    document.getElementById('routeIntList').innerHTML =
-      '<div style="padding:12px;font-family:var(--fM);font-size:10px;color:var(--txt3);text-align:center">Start the server and refresh the Route screen</div>';
-    return;
-  }
-
-  // Determine which route to pre-select
-  const preselect = APP.routeId || APP.serverRoutes[0].id;
-
-  let html = '';
-  APP.serverRoutes.forEach(r=>{
-    const sel = r.id === preselect ? ' selected' : '';
-    html += `<option value="${r.id}"${sel}>${r.name} · ETA ${r.navpath_eta}</option>`;
-  });
-  srvSel.innerHTML = html;
-
-  function applyRoute(r){
-    if(!r) return;
-    APP.routeId = r.id;
-    document.getElementById('rFrom').textContent    = r.origin;
-    document.getElementById('rTo').textContent      = r.destination;
-    document.getElementById('navDest').textContent  = r.destination;
-    APP.navDestName  = r.destination;
-    APP.navDestCoord = {lat: r.dest_lat, lng: r.dest_lon};
-    const etaMin   = document.getElementById('etaMin');
-    const etaVs    = document.getElementById('etaVs');
-    const etaSaved = document.getElementById('etaSaved');
-    if(etaMin)   etaMin.textContent   = r.navpath_eta;
-    if(etaVs)    etaVs.textContent    = 'vs ' + r.manual_eta + ' without NavPath';
-    if(etaSaved) etaSaved.textContent = '\u26a1 ~' + r.time_saved;
-    updateIntersectionList(r);
-    previewRoute(APP.navDestCoord);
-  }
-
-  srvSel.onchange = ()=>{
-    const r = APP.serverRoutes.find(x=>x.id===srvSel.value);
-    applyRoute(r);
-  };
-
-  // Auto-apply the pre-selected route immediately
-  const preRoute = APP.serverRoutes.find(x=>x.id===preselect);
-  applyRoute(preRoute);
-}
-
-/* ═══════════════════════════════════════
-   INTERSECTION LIST — populate from server
-═══════════════════════════════════════ */
-function updateIntersectionList(route){
-  const container  = document.getElementById('routeIntList');
-  const lblEl      = document.getElementById('intListLbl');
-  if(!container || !route) return;
-
-  // Show loading
-  container.innerHTML = '<div style="padding:12px;font-family:var(--fM);font-size:10px;color:var(--txt3);text-align:center">Loading intersections…</div>';
-
-  fetch(SERVER_URL+'/api/intersections')
-    .then(r=>r.json())
-    .then(allInts=>{
-      // Filter to only the intersections on this route, in order
-      const routeIntIds = route.intersections || [];
-      const filtered = routeIntIds.map(id => allInts.find(i=>i.id===id)).filter(Boolean);
-
-      if(lblEl) lblEl.textContent = filtered.length + ' Intersection' + (filtered.length!==1?'s':'') + ' to Clear';
-
-      if(!filtered.length){
-        container.innerHTML = '<div style="padding:12px;font-family:var(--fM);font-size:10px;color:var(--txt3);text-align:center">No intersections on this route</div>';
-        return;
-      }
-
-      container.innerHTML = filtered.map((int, idx) => {
-        const state   = int.state === 'OVERRIDE' ? 'c' : 'p';
-        const stLabel = int.state === 'OVERRIDE' ? 'ACTIVE' : (int.state === 'NORMAL' && int.locked_by ? 'LOCKED' : 'PENDING');
-        const hwBadge = int.hardware ? ' 📡' : '';
-        return `
-          <div class="intItem ${int.state==='NORMAL'&&int.locked_by?'cleared':''}" id="srvInt_${int.id}">
-            <div class="intN">${idx + 1}</div>
-            <div class="intDot ${state}"></div>
-            <div class="intNm">${int.name}${hwBadge}</div>
-            <div class="intD">${int.overrides_today} overrides today</div>
-            <div class="intSt ${state}">${stLabel}</div>
-          </div>`;
-      }).join('');
-
-      // Store current list for live updates
-      APP._routeIntIds = routeIntIds;
-    })
-    .catch(()=>{
-      container.innerHTML = '<div style="padding:12px;font-family:var(--fM);font-size:10px;color:var(--txt3);text-align:center">Could not load intersections — server offline?</div>';
-    });
-}
-
-/* Live update intersection items from analytics event */
-function updateRouteIntListFromAnalytics(intersections){
-  if(!intersections || !APP._routeIntIds) return;
-  APP._routeIntIds.forEach(id=>{
-    const el  = document.getElementById('srvInt_'+id);
-    const int = intersections.find(i=>i.id===id);
-    if(!el || !int) return;
-    const isOverride = int.state==='OVERRIDE';
-    const isCleared  = int.state==='NORMAL' && !int.locked_by && (int.overrides_today>0);
-    el.className = 'intItem' + (isCleared?' cleared':'');
-    const dot   = el.querySelector('.intDot');
-    const st    = el.querySelector('.intSt');
-    const dist  = el.querySelector('.intD');
-    if(dot){ dot.className='intDot '+(isOverride?'c':'p'); }
-    if(st){
-      st.className = 'intSt '+(isOverride?'c':'p');
-      st.textContent = isOverride ? '🔴 CLEARING' : (isCleared ? '✅ CLEARED' : 'PENDING');
-    }
-    if(dist && int.distance!=null) dist.textContent = int.distance > 999 ? (int.distance/1000).toFixed(1)+' km' : int.distance+' m';
-  });
-}
-
-function toggleTheme(el) {
-  if (el) {
-    const tog = el.querySelector('.tog');
-    if(tog) tog.classList.toggle('on');
-  }
-  
-  const isLight = document.documentElement.classList.toggle('light-mode');
-  const lbl = document.getElementById('themeLbl');
-  if(lbl) lbl.textContent = isLight ? 'LIGHT' : 'DARK';
-  
-  const mapStyle = isLight ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
-  if(APP.homeMap) APP.homeMap.setOptions({styles: mapStyle});
-  if(APP.navMap && typeof APP.navMap.setOptions === 'function') APP.navMap.setOptions({styles: mapStyle});
-  
-  toast(isLight ? '🔆 Light mode activated' : '🌙 Night mode activated');
-}
-
-// Note: toast(), goTo(), doLogin(), doSignup(), doLogout() are defined above with full logic.
-
-/* ═══════════════════════════════════════
-   INIT
-═══════════════════════════════════════ */
-window.addEventListener('DOMContentLoaded',()=>{
-  // Try to get location silently on load to pre-populate hospitals
-  if(navigator.geolocation){
+window.addEventListener('DOMContentLoaded', () => {
+  // Silent location prefetch so hospital list is ready before Route screen opens
+  if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       pos => fetchNearbyHospitals(pos.coords.latitude, pos.coords.longitude),
-      err => console.log('Silent location failed for prefetching hospitals', err)
+      err => console.log('[NavPath] Silent location prefetch skipped:', err.message),
     );
   }
-  
-  // Demo hint removed
-  const info=document.getElementById('lInfo');
-  if(info) info.style.display='none';
+
+  // lInfo is hidden by default via inline style — no action needed
   keepOn();
-  window.addEventListener('resize',()=>{
-    if(APP.homeMap) google.maps.event.trigger(APP.homeMap, 'resize');
-    if(APP.navMap)  google.maps.event.trigger(APP.navMap, 'resize');
+
+  window.addEventListener('resize', () => {
+    if (APP.homeMap) google.maps.event.trigger(APP.homeMap, 'resize');
+    if (APP.navMap && typeof APP.navMap.invalidateSize === 'function') APP.navMap.invalidateSize();
   });
 });
-</script>
-
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-
-<!-- Config and Auth Logic -->
-<script src="/static/firebase-config.js"></script>
-<script src="/static/auth.js"></script>
-
-<!-- NavPath Bug Fix Patch -->
-<script>
-console.log('[NavPath] Bug fix patch loaded — ETA, timer, distance, and banner issues resolved');
-
-// Bug 1: NEW clean formatter without floats
-window.fmtEta = function(seconds) {
-    if(!seconds || seconds <= 0) return '0m 00s';
-    const totalSec = Math.round(seconds);
-    const m = Math.floor(totalSec / 60);
-    const s = totalSec % 60;
-    return m + 'm ' + (s < 10 ? '0' : '') + s + 's';
-};
-
-// Bug 2: drawDirectionsOnNavMap overrides
-const _old_draw = window.drawDirectionsOnNavMap;
-window.drawDirectionsOnNavMap = function(result) {
-    if(_old_draw) _old_draw(result);
-    // Hard override values with integers to prevent Bug 1
-    if(result && result.routes && result.routes[0]) {
-        const route = result.routes[0];
-        APP.navEtaSec = Math.round(route.duration);
-        APP.navTotalSec = Math.round(route.duration);
-        APP.navTotalDist = Math.round(route.distance);
-        
-        const m = Math.floor(APP.navEtaSec / 60);
-        const etaStr = window.fmtEta(APP.navEtaSec);
-        
-        const elEta = document.getElementById('navEta');
-        if(elEta) elEta.textContent = etaStr;
-        
-        const elMin = document.getElementById('etaMin');
-        if(elMin) elMin.textContent = etaStr;
-        
-        const bEta = document.getElementById('bEta');
-        if(bEta) bEta.textContent = 'ETA ~' + m + ' min';
-    }
-
-    // Only start the timer AFTER route is drawn
-    if (!APP._navTimerRunning) {
-        window.startNavTimer();
-    }
-};
-
-// Bug 2 & 3 & 4: startNavTimer override
-window.startNavTimer = function() {
-    if (APP.navTimer) clearInterval(APP.navTimer);
-    APP._navTimerRunning = true; // Guard flag set
-    
-    APP.navProgress = 0;
-    // Force integer total
-    APP.navTotalSec = Math.round(APP.navEtaSec || 574);
-    const totalSec  = APP.navTotalSec;
-    const totalDist = Math.round(APP.navTotalDist || (totalSec * 14));
-    let lastStepIdx = -1;
-
-    APP.navTimer = setInterval(() => {
-        // 1. Calculate and update Speed first
-        const spd = APP.gps?.speed != null ? Math.round(APP.gps.speed * 3.6)
-                  : (APP.gpsMode === 'sim' ? 45 + Math.floor(Math.random() * 30) : 0);
-        const elSpd = document.getElementById('navSpd');
-        if(elSpd) {
-            elSpd.textContent = spd;
-            elSpd.classList.toggle('hot', spd > 80);
-        }
-
-        // 2. Only tick down ETA (and make progress) if speed > 0
-        if (spd > 0) {
-            if(APP.navEtaSec > 0) APP.navEtaSec = Math.max(0, APP.navEtaSec - 1);
-        }
-        
-        APP.navProgress = Math.min(((totalSec - APP.navEtaSec) / totalSec) * 100, 100);
-
-        // Bug 1: clean formatting
-        const uiEta = document.getElementById('navEta');
-        if (uiEta) uiEta.textContent = window.fmtEta(APP.navEtaSec);
-
-        const rpFill = document.getElementById('rpFill');
-        if(rpFill) rpFill.style.width = APP.navProgress.toFixed(1) + '%';
-        const rpLabel = document.getElementById('rpLabel');
-        if(rpLabel) rpLabel.textContent = Math.round(APP.navProgress) + '%';
-
-        // Bug 3: Proper distance unit update + overflow fix
-        const distRem = Math.max(0, Math.round(totalDist * (1 - APP.navProgress / 100)));
-        const bannerCheck = document.getElementById('intBanner');
-        if (!bannerCheck || !bannerCheck.dataset.serverControlled) {
-            const bDistEl = document.getElementById('bDist');
-            if (bDistEl) {
-                const unitEl = bDistEl.nextElementSibling;
-                if (distRem > 999) {
-                    bDistEl.textContent = (distRem / 1000).toFixed(1);
-                    if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' km';
-                } else {
-                    bDistEl.textContent = distRem;
-                    if (unitEl && unitEl.classList.contains('distUnit')) unitEl.textContent = ' m';
-                }
-            }
-
-            const bEtaEl = document.getElementById('bEta');
-            if(bEtaEl) {
-                const mins = Math.ceil(APP.navEtaSec / 60);
-                bEtaEl.textContent = distRem > 0 ? 'ETA ~' + mins + ' min' : 'Arriving...';
-            }
-        }
-
-        // Bug 4: Fix Intersection banner flickering based on step.name
-        let bannerIntText = null;
-        if (APP.routeId && APP.serverRoutes && APP._srvIntMap) {
-            const activeRoute = APP.serverRoutes.find(r => r.id === APP.routeId);
-            if (activeRoute && activeRoute.intersections && activeRoute.intersections.length > 0) {
-                const t = APP.navProgress / 100;
-                const ints = activeRoute.intersections;
-                const nextI = Math.min(Math.floor(t * ints.length) + 1, ints.length - 1);
-                const intId = ints[nextI];
-                const iName = APP._srvIntMap[intId]?.name || 'Junction';
-                bannerIntText = intId + ' · ' + iName;
-            }
-        }
-        
-        // Fallback to OSRM steps if no server route selected (e.g. ad-hoc map tap)
-        if (!bannerIntText && APP._navSteps && APP._navSteps.length > 1) {
-            const t = APP.navProgress / 100;
-            const stepI = Math.min(Math.floor(t * APP._navSteps.length), APP._navSteps.length - 1);
-            const nextI = Math.min(stepI + 1, APP._navSteps.length - 1);
-            const nxStep = APP._navSteps[nextI];
-            const roadName = nxStep.name ? nxStep.name.split(',')[0] : 'Junction';
-            bannerIntText = 'Step ' + nextI + ' · ' + roadName;
-        }
-
-        const banner = document.getElementById('intBanner');
-        if (bannerIntText && banner && !banner.dataset.serverControlled) {
-            const bNameEl = document.getElementById('bName');
-            const bStatusEl = document.getElementById('bStatus');
-            
-            if (bNameEl && bNameEl.textContent !== bannerIntText) {
-                bNameEl.textContent = bannerIntText;
-            }
-            if (banner.className !== 'intBanner approaching') {
-                banner.className = 'intBanner approaching';
-            }
-            if (bStatusEl && bStatusEl.textContent !== '⬤  APPROACHING') {
-                bStatusEl.textContent = '⬤  APPROACHING';
-            }
-        }
-
-        // Marker & Voice
-        if(APP.navRoute && APP.navRoute.length > 1 && APP.navMarker){
-            const t = APP.navProgress / 100;
-            const segs = APP.navRoute.length - 1;
-            const si = Math.max(0, Math.min(Math.floor(t * segs), segs - 1));
-            const lt = t * segs - si;
-            const a = APP.navRoute[si], b = APP.navRoute[si + 1];
-            const newPos = [ a.lat + (b.lat - a.lat) * lt, a.lng + (b.lng - a.lng) * lt ];
-            
-            if(APP.gpsMode !== 'real') {
-                APP.navMarker.setLatLng(newPos);
-                if(APP.navMap) APP.navMap.panTo(newPos);
-            }
-
-            if(APP._navSteps && APP._navSteps.length){
-                const stepIdx = Math.min(Math.floor(t * APP._navSteps.length), APP._navSteps.length - 1);
-                if(stepIdx !== lastStepIdx){
-                    lastStepIdx = stepIdx;
-                    if(typeof announceStep === 'function') announceStep(APP._navSteps[stepIdx]);
-                }
-            }
-        }
-
-        if(APP.navEtaSec <= 0) {
-            clearInterval(APP.navTimer);
-            APP.navTimer = null;
-            APP._navTimerRunning = false;
-            if(typeof arrive === 'function') arrive();
-        }
-    }, 1000);
-};
-
-// goTo override: resets timer guard on screen change
-const _old_goTo = window.goTo;
-window.goTo = function(screenId) {
-    if (screenId === 'sHome' || screenId === 'sComplete' || screenId === 'sRoute') {
-        APP._navTimerRunning = false;
-        if (APP.navTimer) {
-            clearInterval(APP.navTimer);
-            APP.navTimer = null;
-        }
-    }
-    if (_old_goTo) _old_goTo(screenId);
-};
-
-// previewRoute override: uses fmtEta for Route screen
-const _old_previewRoute = window.previewRoute;
-window.previewRoute = function(destCoord) {
-    if(!APP.gps || !destCoord) return;
-    const url = `https://router.project-osrm.org/route/v1/driving/${APP.gps.lng},${APP.gps.lat};${destCoord.lng},${destCoord.lat}?overview=full&geometries=geojson&steps=true`;
-    fetch(url).then(r=>r.json()).then(res=>{
-        if(res.code !== 'Ok') return;
-        const route = res.routes[0];
-        const roundedDur = Math.round(route.duration);
-        const manualDur = Math.round(roundedDur * 1.35); // 35% slower without NavPath (dynamic)
-        const savedDur = manualDur - roundedDur;
-        
-        const etaMinEl = document.getElementById('etaMin');
-        if(etaMinEl) etaMinEl.textContent = window.fmtEta(roundedDur);
-        
-        const etaVsEl = document.getElementById('etaVs');
-        if(etaVsEl) etaVsEl.textContent = 'vs ' + window.fmtEta(manualDur) + ' without NavPath';
-        
-        const etaSavedEl = document.getElementById('etaSaved');
-        if(etaSavedEl) etaSavedEl.textContent = '⚡ ~' + window.fmtEta(savedDur);
-        
-        const distStr = route.distance > 1000 ? (route.distance/1000).toFixed(1)+' km' : Math.round(route.distance)+' m';
-        const etaDistEl = document.getElementById('etaDist');
-        if(etaDistEl) etaDistEl.textContent = distStr;
-        APP._pendingDirectionsResult = res;
-    }).catch(e => console.warn(e));
-};
-
-/* ═══════════════════════════════════════
-   EMERGA VOICE AGENT
-═══════════════════════════════════════ */
-let emergaRecognition = null;
-let emergaActive = false;
-
-window.initEmerga = function() {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) {
-        console.warn('Speech Recognition not supported in this browser.');
-        return;
-    }
-    emergaRecognition = new SpeechRec();
-    emergaRecognition.continuous = true;
-    emergaRecognition.interimResults = false;
-    
-    emergaRecognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-        console.log('[Emerga] Heard: ', transcript);
-        if (transcript.includes('critical')) {
-            setPrio('critical');
-        } else if (transcript.includes('urgent')) {
-            setPrio('urgent');
-        } else if (transcript.includes('routine')) {
-            setPrio('routine');
-        } else if (transcript.includes('sos')) {
-            setPrio('critical');
-            doSOS(); 
-        }
-    };
-    
-    emergaRecognition.onstart = () => {
-        const ag = document.getElementById('emergaAgent');
-        if(ag) ag.classList.add('listening');
-        toast('🎙️ Emerga listening...');
-    };
-    
-    emergaRecognition.onend = () => {
-        if(emergaActive) {
-            try { emergaRecognition.start(); } catch(e){}
-        } else {
-            const ag = document.getElementById('emergaAgent');
-            if(ag) ag.classList.remove('listening');
-        }
-    };
-};
-
-window.toggleEmerga = function() {
-    if(!emergaRecognition) {
-        initEmerga();
-        if(!emergaRecognition) {
-            toast('Voice recognition not supported');
-            return;
-        }
-    }
-    emergaActive = !emergaActive;
-    if(emergaActive) {
-        try { emergaRecognition.start(); } catch(e){}
-    } else {
-        emergaRecognition.stop();
-        const ag = document.getElementById('emergaAgent');
-        if(ag) ag.classList.remove('listening');
-        toast('Emerga voice agent paused.');
-    }
-};
-
-// Auto-init silently
-setTimeout(() => window.initEmerga(), 2000);
-
 </script>
 
 </body>
